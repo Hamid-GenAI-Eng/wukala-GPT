@@ -57,8 +57,9 @@ services:
 
   - type: pserv
     name: qdrant-db
-    env: docker
-    image: qdrant/qdrant:latest
+    env: image
+    image:
+      url: qdrant/qdrant:latest
     plan: starter
     disk:
       name: qdrant-data
