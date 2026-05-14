@@ -1,0 +1,885 @@
+/**
+ * API Service Layer for Wukala-GPT Backend
+ *
+ * Centralized HTTP client for communicating with the Azure-hosted backend.
+ * All API calls should go through this service.
+ */
+
+// Base API URL - Update this with your actual Azure backend URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
+// Request timeout in milliseconds (increased for large file uploads and Azure cold-starts)
+const REQUEST_TIMEOUT = 120000;
+
+/**
+ * Custom error class for API errors
+ */
+export class ApiError extends Error {
+  status: number;
+  data?: unknown;
+
+  constructor(message: string, status: number, data?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.data = data;
+  }
+}
+
+/**
+ * Get the auth token from localStorage
+ */
+function getAuthToken(): string | null {
+  return sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token');
+}
+
+/**
+ * Build headers for API requests
+ */
+function buildHeaders(contentType?: string, includeAuth: boolean = true): HeadersInit {
+  const headers: Record<string, string> = {};
+
+  if (contentType) {
+    headers['Content-Type'] = contentType;
+  }
+
+  if (includeAuth) {
+    const token = getAuthToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+
+  return headers;
+}
+
+/**
+ * Handle API response and errors
+ */
+async function handleResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    let errorMessage = `HTTP error! status: ${response.status}`;
+    let data: unknown = undefined;
+
+    try {
+      data = await response.json();
+      errorMessage = (data as Record<string, unknown>)?.message as string || errorMessage;
+    } catch {
+      errorMessage = await response.text() || errorMessage;
+    }
+
+    throw new ApiError(errorMessage, response.status, data);
+  }
+
+  // Handle no-content responses
+  if (response.status === 204 || response.status === 205) {
+    return {} as T;
+  }
+
+  return response.json();
+}
+
+/**
+ * Generic request function with timeout and params support
+ */
+async function request<T>(
+  endpoint: string,
+  options: RequestInit & { params?: Record<string, any> } = {},
+  includeAuth: boolean = true
+): Promise<T> {
+  let queryString = '';
+  if (options.params) {
+    const params = new URLSearchParams();
+    Object.entries(options.params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.append(key, String(value));
+      }
+    });
+    const s = params.toString();
+    if (s) queryString = `?${s}`;
+  }
+
+  const url = `${API_BASE_URL}${endpoint}${queryString}`;
+  const headers = buildHeaders(
+    options.body instanceof FormData ? undefined : 'application/json',
+    includeAuth
+  );
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: { ...headers, ...options.headers },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    return handleResponse<T>(response);
+  } catch (error) {
+    clearTimeout(timeoutId);
+
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError('Request timeout', 408);
+    }
+
+    throw new ApiError('Network error. Please check your connection.', 0);
+  }
+}
+
+/**
+ * API Methods
+ */
+export const api = {
+  // ==================== AUTH ENDPOINTS ====================
+
+  /**
+   * Login user with email and password
+   * Note: The backend returns { token, message }. The user profile
+   * should be fetched separately via getProfile() after setting the token.
+   */
+  login: async (email: string, password: string) => {
+    return request<{ token: string; message: string }>('/Auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }, false);
+  },
+
+  /**
+   * Register a new client user
+   */
+  registerClient: async (data: {
+    fullName: string;
+    email: string;
+    phoneNo: string;
+    city: string;
+    password: string;
+  }) => {
+    return request<{ user: User; message: string }>('/Auth/register-client', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, false);
+  },
+
+  /**
+   * Register a new lawyer user (with application for review)
+   */
+  registerLawyer: async (formData: FormData) => {
+    return request<{ application: LawyerApplication; message: string }>('/Auth/register-lawyer', {
+      method: 'POST',
+      body: formData,
+    }, false);
+  },
+
+  /**
+   * Verify OTP code
+   */
+  verifyOtp: async (email: string, otpCode: string) => {
+    return request<{ verified: boolean; user?: User; token?: string }>('/Auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otpCode }),
+    }, false);
+  },
+
+  /**
+   * Resend OTP code
+   */
+  resendOtp: async (email: string) => {
+    return request<{ message: string }>('/Auth/resend-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }, false);
+  },
+
+  /**
+   * Request password reset link
+   */
+  forgotPassword: async (email: string) => {
+    return request<{ message: string }>('/Auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }, false);
+  },
+
+  /**
+   * Reset password using token
+   */
+  resetPassword: async (data: { email: string; token: string; newPassword: string }) => {
+    return request<{ message: string }>('/Auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, false);
+  },
+
+  /**
+   * Change password for logged-in user
+   */
+  changePassword: async (data: { currentPassword: string; newPassword: string }) => {
+    return request<{ message: string }>('/Auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  /**
+   * Logout user (invalidate token)
+   */
+  logout: async () => {
+    return request<{ message: string }>('/Auth/logout', {
+      method: 'POST',
+    }, true);
+  },
+
+  /**
+   * Get current user profile (Me)
+   */
+  getProfile: async () => {
+    const userData = await request<User>('/Auth/me', {
+      method: 'GET',
+    }, true);
+    
+    // Normalize role to lowercase for frontend consistency
+    if (userData && typeof userData.role === 'string') {
+      userData.role = userData.role.toLowerCase() as any;
+    }
+    
+    return userData;
+  },
+
+  // ==================== LAWYER PROFILE ENDPOINTS ====================
+
+  /**
+   * Get current lawyer profile
+   */
+  getLawyerMe: async () => {
+    return request<any>('/Lawyers/me', {
+      method: 'GET',
+    }, true);
+  },
+
+  /**
+   * Update current lawyer profile
+   */
+  updateLawyerMe: async (data: any) => {
+    return request<any>('/Lawyers/me', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  /**
+   * Update lawyer profile photo
+   */
+  uploadLawyerPhoto: async (formData: FormData) => {
+    return request<{ photoUrl: string }>('/Lawyers/me/photo', {
+      method: 'POST',
+      body: formData,
+    }, true);
+  },
+
+  // --- Experience ---
+  addExperience: async (data: ExperienceRequest) => {
+    return request<ExperienceResponse>('/Lawyers/me/experience', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  updateExperience: async (id: string, data: ExperienceRequest) => {
+    return request<ExperienceResponse>(`/Lawyers/me/experience/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  deleteExperience: async (id: string) => {
+    return request<{ message: string }>(`/Lawyers/me/experience/${id}`, {
+      method: 'DELETE',
+    }, true);
+  },
+
+  // --- Education ---
+  addEducation: async (data: EducationRequest) => {
+    return request<EducationResponse>('/Lawyers/me/education', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  updateEducation: async (id: string, data: EducationRequest) => {
+    return request<EducationResponse>(`/Lawyers/me/education/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  deleteEducation: async (id: string) => {
+    return request<{ message: string }>(`/Lawyers/me/education/${id}`, {
+      method: 'DELETE',
+    }, true);
+  },
+
+  // --- Specialities ---
+  getSpecialities: async () => {
+    return request<SpecialityResponse[]>('/Lawyers/specialities', {
+      method: 'GET',
+    }, true);
+  },
+
+  updateSpecialities: async (specialityIds: string[]) => {
+    return request<{ message: string }>('/Lawyers/me/specialities', {
+      method: 'PUT',
+      body: JSON.stringify(specialityIds),
+    }, true);
+  },
+
+  // --- Badges ---
+  updateLawyerBadgesSelf: async (id: string, badges: string[]) => {
+    return request<{ message: string }>(`/Lawyers/${id}/badges`, {
+      method: 'PUT',
+      body: JSON.stringify(badges),
+    }, true);
+  },
+
+  /**
+   * Get list of lawyer applications (Admin)
+   */
+  getLawyers: async (status?: number) => {
+    return request<LawyerApplication[]>('/Admin/lawyers', {
+      method: 'GET',
+      params: status !== undefined ? { status } : undefined,
+    }, true);
+  },
+
+  /**
+   * Verify a lawyer application (Admin)
+   */
+  verifyLawyer: async (id: string, status: number, reviewNotes: string) => {
+    return request<{ message: string }>(`/Admin/lawyers/${id}/verify`, {
+      method: 'PUT',
+      body: JSON.stringify({ 
+        Status: status, 
+        ReviewNotes: reviewNotes 
+      }),
+    }, true);
+  },
+
+  /**
+   * Delete a lawyer application entirely (Admin/Emergency)
+   * Used for cleanup of ghost/orphaned records.
+   */
+  deleteLawyerApplication: async (id: string) => {
+    return request<{ message: string }>(`/Admin/lawyers/${id}`, {
+      method: 'DELETE',
+    }, true);
+  },
+
+  /**
+   * Suspend or unsuspend a user (Admin)
+   */
+  suspendUser: async (id: string, isSuspended: boolean, reason?: string) => {
+    return request<{ message: string }>(`/Admin/users/${id}/suspend`, {
+      method: 'PUT',
+      body: JSON.stringify({ isSuspended, reason }),
+    }, true);
+  },
+
+  /**
+   * Update lawyer badges (Admin)
+   */
+  updateLawyerBadges: async (id: string, badges: string[]) => {
+    return request<{ message: string }>(`/Admin/lawyers/${id}/badges`, {
+      method: 'PUT',
+      body: JSON.stringify(badges),
+    }, true);
+  },
+
+  /**
+   * Get platform statistics (Admin)
+   */
+  getAdminStats: async () => {
+    return request<AdminStats>('/Admin/stats', {
+      method: 'GET',
+    }, true);
+  },
+
+  // ==================== DOCUMENT ENDPOINTS ====================
+
+  /**
+   * Get list of documents with optional filtering
+   */
+  getDocuments: async (type?: number, search?: string) => {
+    return request<DocumentResponse[]>('/Documents', {
+      method: 'GET',
+      params: { type, search },
+    }, true);
+  },
+
+  /**
+   * Upload a new document
+   */
+  uploadDocument: async (file: File, optionalTitle?: string) => {
+    const formData = new FormData();
+    formData.append('File', file);
+    if (optionalTitle) {
+      formData.append('OptionalTitle', optionalTitle);
+    }
+    return request<DocumentResponse>('/Documents', {
+      method: 'POST',
+      body: formData,
+    }, true);
+  },
+
+  /**
+   * Get a specific document by ID
+   */
+  getDocument: async (id: string) => {
+    return request<DocumentResponse>(`/Documents/${id}`, {
+      method: 'GET',
+    }, true);
+  },
+
+  /**
+   * Delete a document by ID
+   */
+  deleteDocument: async (id: string) => {
+    return request<{ message: string }>(`/Documents/${id}`, {
+      method: 'DELETE',
+    }, true);
+  },
+
+  // ==================== SEARCH ENDPOINTS ====================
+
+  /**
+   * Search for lawyers with filters
+   */
+  searchLawyers: async (params: SearchParams) => {
+    const res = await request<any>('/Search/lawyers', {
+      method: 'GET',
+      params,
+    }, false);
+    return Array.isArray(res) ? res : (res.items || res.Items || []);
+  },
+
+  /**
+   * Get featured lawyers
+   */
+  getFeaturedLawyers: async () => {
+    const res = await request<any>('/Search/lawyers', {
+      method: 'GET',
+    }, false);
+    return Array.isArray(res) ? res : (res.items || res.Items || []);
+  },
+
+  /**
+   * Get a detailed public profile for a lawyer
+   */
+  getPublicLawyer: async (id: string) => {
+    return request<PublicLawyerProfile>(`/Search/lawyers/${id}`, {
+      method: 'GET',
+    }, false);
+  },
+
+  // ==================== SAVED PROFILE ENDPOINTS ====================
+
+  /**
+   * Get all saved lawyer profiles for the current user
+   */
+  getSavedProfiles: async () => {
+    return request<PublicLawyerProfile[]>('/SavedProfile', {
+      method: 'GET',
+    }, true);
+  },
+
+  /**
+   * Toggle a lawyer profile as saved
+   */
+  saveProfile: async (lawyerId: string) => {
+    return request<{ message: string }>('/SavedProfile', {
+      method: 'POST',
+      body: JSON.stringify({ lawyerId }),
+    }, true);
+  },
+
+  // ==================== MESSAGING ENDPOINTS ====================
+
+  /**
+   * Get all active conversations for the current user
+   */
+  getConversations: async () => {
+    return request<Conversation[]>('/Messages/conversations', {
+      method: 'GET',
+    }, true);
+  },
+
+  /**
+   * Get message history for a specific conversation/user
+   */
+  getMessages: async (targetUserId: string) => {
+    return request<ChatMessage[]>(`/Messages/${targetUserId}`, {
+      method: 'GET',
+    }, true);
+  },
+
+  /**
+   * Send a message through a standard POST request
+   */
+  sendMessage: async (targetUserId: string, content: string) => {
+    return request<ChatMessage>('/Messages', {
+      method: 'POST',
+      body: JSON.stringify({ targetUserId, content }),
+    }, true);
+  },
+
+  /**
+   * Mark messages in a conversation as read
+   */
+  markAsRead: async (targetUserId: string) => {
+    return request<{ message: string }>(`/Messages/${targetUserId}/read`, {
+      method: 'PUT',
+    }, true);
+  },
+
+  // ==================== DASHBOARD ENDPOINTS ====================
+
+  /**
+   * Get lawyer dashboard overview data
+   */
+  getLawyerDashboardOverview: async () => {
+    return request<any>('/Dashboard/lawyer-overview', {
+      method: 'GET',
+    }, true);
+  },
+
+  // ==================== NOTIFICATION ENDPOINTS ====================
+
+  /**
+   * Get my notifications
+   */
+  getNotifications: async (tab: string = 'all') => {
+    return request<any[]>('/Notifications', {
+      method: 'GET',
+      params: { tab },
+    }, true);
+  },
+
+  /**
+   * Mark a notification as read
+   */
+  markNotificationAsRead: async (id: string) => {
+    return request<void>(`/Notifications/${id}/read`, {
+      method: 'PUT',
+    }, true);
+  },
+
+  /**
+   * Mark all notifications as read
+   */
+  markAllNotificationsAsRead: async () => {
+    return request<void>('/Notifications/read-all', {
+      method: 'PUT',
+    }, true);
+  },
+
+  /**
+   * Dismiss a notification
+   */
+  dismissNotification: async (id: string) => {
+    return request<void>(`/Notifications/${id}`, {
+      method: 'DELETE',
+    }, true);
+  },
+
+  // ==================== BILLING ENDPOINTS ====================
+
+  /**
+   * Get billing summary (Revenue, Outstanding, etc.)
+   */
+  getBillingSummary: async () => {
+    return request<any>('/Billing/summary', {
+      method: 'GET',
+    }, true);
+  },
+
+  /**
+   * Get invoices
+   */
+  getInvoices: async (status?: string, search?: string) => {
+    return request<any[]>('/Billing/invoices', {
+      method: 'GET',
+      params: { status, search },
+    }, true);
+  },
+
+  /**
+   * Get a specific invoice
+   */
+  getInvoice: async (id: string) => {
+    return request<any>(`/Billing/invoices/${id}`, {
+      method: 'GET',
+    }, true);
+  },
+
+  /**
+   * Create a new invoice
+   */
+  createInvoice: async (data: any) => {
+    return request<any>('/Billing/invoices', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  /**
+   * Get recent payments
+   */
+  getRecentPayments: async () => {
+    return request<any[]>('/Billing/recent-payments', {
+      method: 'GET',
+    }, true);
+  },
+
+  /**
+   * Get retainers
+   */
+  getRetainers: async () => {
+    return request<any[]>('/Billing/retainers', {
+      method: 'GET',
+    }, true);
+  },
+
+  /**
+   * Get billing templates
+   */
+  getTemplates: async () => {
+    return request<any[]>('/Billing/templates', {
+      method: 'GET',
+    }, true);
+  },
+
+  // ==================== AI CHAT ENDPOINTS ====================
+
+  /**
+   * Get user's AI Chat sessions
+   */
+  getAiChatSessions: async () => {
+    return request<AiChatSession[]>('/AiChat/sessions', {
+      method: 'GET',
+    }, true);
+  },
+
+  /**
+   * Create a new AI Chat session manually
+   */
+  createAiChatSession: async (title: string) => {
+    return request<AiChatSession>('/AiChat/sessions', {
+      method: 'POST',
+      body: JSON.stringify(title),
+    }, true);
+  },
+
+  /**
+   * Get message history for a specific AI session
+   */
+  getAiChatMessages: async (sessionId: string) => {
+    return request<AiChatMessage[]>(`/AiChat/sessions/${sessionId}/messages`, {
+      method: 'GET',
+    }, true);
+  },
+
+  /**
+   * Send a message to AI (auto-creates session if sessionId is undefined)
+   */
+  sendAiChatMessage: async (requestData: AiChatRequest) => {
+    return request<AiChatResponse>('/AiChat/message', {
+      method: 'POST',
+      body: JSON.stringify(requestData),
+    }, true);
+  },
+
+  /**
+   * Delete an AI Chat session
+   */
+  deleteAiChatSession: async (sessionId: string) => {
+    return request<void>(`/AiChat/sessions/${sessionId}`, {
+      method: 'DELETE',
+    }, true);
+  },
+};
+
+
+// ==================== TYPE DEFINITIONS ====================
+
+export interface AdminStats {
+  totalUsers: number;
+  totalLawyers: number;
+  totalClients: number;
+  pendingVerifications: number;
+  approvedVerifications: number;
+  rejectedVerifications: number;
+  activeChats: number;
+  totalDocuments: number;
+}
+
+export interface DocumentResponse {
+  id: string;
+  name: string;
+  url: string;
+  sizeFormatted: string;
+  sizeInBytes: number;
+  classification: string; // The backend returns the string name of the classification
+  mimeType: string;
+  uploadedAt: string;
+  timeAgo: string;
+}
+
+export enum DocumentClassification {
+  LegalDoc = 0,
+  Contract = 1,
+  Image = 2,
+  Other = 3,
+}
+
+export interface ExperienceRequest {
+  title: string;
+  company: string;
+  location: string;
+  startDate: string;
+  endDate?: string;
+  isCurrent: boolean;
+  description: string;
+}
+
+export interface ExperienceResponse extends ExperienceRequest {
+  id: string;
+}
+
+export interface EducationRequest {
+  degree: string;
+  institution: string;
+  fieldOfStudy: string;
+  startDate: string;
+  endDate?: string;
+  grade: string;
+  description: string;
+}
+
+export interface EducationResponse extends EducationRequest {
+  id: string;
+}
+
+export interface SpecialityResponse {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: 'client' | 'lawyer' | 'admin';
+  phoneNo?: string;
+  city?: string;
+  profileImage?: string;
+  status?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface LawyerApplication {
+  id: string;
+  userId?: string;
+  fullName: string;
+  email: string;
+  phoneNo: string;
+  city: string;
+  barCouncilNumber: string;
+  degreeTitle: string;
+  university: string;
+  yearOfCompletion: number;
+  chamberAddress: string;
+  degree?: string;
+  introVideo?: string;
+  status: number | string; // Matches VerificationStatus enum
+  submittedAt: string;
+  isEmailVerified?: boolean; 
+}
+
+export interface SearchParams {
+  query?: string;
+  city?: string;
+  specialityId?: string;
+}
+
+export interface PublicLawyerProfile {
+  id: string;
+  fullName: string;
+  profileImage?: string;
+  city: string;
+  degreeTitle: string;
+  university: string;
+  bio?: string;
+  experienceYears?: number;
+  rating?: number;
+  reviewCount?: number;
+  hourlyRate?: number;
+  specialities: SpecialityResponse[];
+  educations?: EducationResponse[];
+  experiences?: ExperienceResponse[];
+  isVerified: boolean;
+  isSaved?: boolean;
+}
+
+export interface Conversation {
+  id: string;
+  targetUserId: string;
+  targetUserName: string;
+  targetUserAvatar?: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
+  isOnline: boolean;
+  isLawyer: boolean;
+}
+
+export interface AiChatSession {
+  id: string;
+  title: string;
+  startedAt: string;
+  lastMessageAt: string;
+}
+
+export interface AiChatMessage {
+  id: string;
+  sessionId: string;
+  role: 'User' | 'Assistant' | 'System';
+  content: string;
+  createdAt: string;
+}
+
+export interface AiChatRequest {
+  message: string;
+  isDeepResearch: boolean;
+  sessionId?: string;
+}
+
+export interface AiChatResponse {
+  response: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  content: string;
+  timestamp: string;
+  isRead: boolean;
+}
+
+export default api;

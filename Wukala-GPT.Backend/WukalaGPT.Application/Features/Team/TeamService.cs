@@ -1,0 +1,223 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using WukalaGPT.Application.DTOs.Team;
+using WukalaGPT.Application.Interfaces;
+using WukalaGPT.Domain.Entities;
+using WukalaGPT.Domain.Enums;
+
+namespace WukalaGPT.Application.Features.Team;
+
+public class TeamService : ITeamService
+{
+    private readonly IApplicationDbContext _context;
+    private readonly ILogger<TeamService> _logger;
+    private readonly IEmailService _emailService;
+
+    public TeamService(IApplicationDbContext context, ILogger<TeamService> logger, IEmailService emailService)
+    {
+        _context = context;
+        _logger = logger;
+        _emailService = emailService;
+    }
+
+    public async Task<List<TeamMemberDto>> GetTeamMembersAsync(Guid firmId)
+    {
+        var users = await _context.Users.AsNoTracking()
+            .Where(u => u.FirmId == firmId)
+            .ToListAsync();
+
+        var userIds = users.Select(u => u.Id).ToList();
+
+        var allTasks = await _context.StaffTasks.AsNoTracking()
+            .Where(t => t.FirmId == firmId && userIds.Contains(t.AssignedToUserId))
+            .ToListAsync();
+
+        var activeCases = await _context.LegalCases.AsNoTracking()
+            .Where(c => c.FirmId == firmId && c.Status != CaseStatus.Closed && userIds.Contains(c.LeadLawyerId))
+            .GroupBy(c => c.LeadLawyerId)
+            .Select(g => new { UserId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(k => k.UserId, v => v.Count);
+
+        var specializations = await _context.LawyerSpecialities.AsNoTracking()
+            .Include(ls => ls.Speciality)
+            .Where(ls => userIds.Contains(ls.LawyerProfile.UserId))
+            .GroupBy(ls => ls.LawyerProfile.UserId)
+            .ToDictionaryAsync(g => g.Key, g => g.Select(s => s.Speciality.Name).FirstOrDefault() ?? "General Practice");
+
+        var results = new List<TeamMemberDto>();
+
+        foreach (var user in users)
+        {
+            var userTasks = allTasks.Where(t => t.AssignedToUserId == user.Id).ToList();
+            var spec = specializations.GetValueOrDefault(user.Id, "General Practice");
+            
+            results.Add(new TeamMemberDto
+            {
+                UserId = user.Id,
+                Name = $"{(user.StaffRole == TeamRole.Clerk ? "" : "Adv. ")}{user.FirstName} {user.LastName}",
+                Role = user.StaffRole?.ToString() ?? "Unknown",
+                Email = user.Email,
+                PhoneNumber = user.PhoneNumber,
+                ActiveCases = activeCases.GetValueOrDefault(user.Id, 0),
+                TasksCompleted = userTasks.Count(t => t.Status == StaffTaskStatus.Completed),
+                TasksPending = userTasks.Count(t => t.Status != StaffTaskStatus.Completed),
+                Status = user.IsOnline ? "Available" : "Busy",
+                Specialization = spec,
+                JoinedDate = user.CreatedAt.ToString("MMM yyyy")
+            });
+        }
+
+        return results;
+    }
+
+    public async Task InviteMemberAsync(Guid firmId, Guid currentUserId, InviteMemberRequestDto request)
+    {
+        _logger.LogInformation("Inviting {Email} to Firm {FirmId} as {Role}", request.Email, firmId, request.Role);
+
+        var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower());
+
+        if (existingUser != null)
+        {
+            existingUser.FirmId = firmId;
+            existingUser.StaffRole = request.Role;
+            await _emailService.SendEmailAsync(request.Email, "You've been added to a Wukala-GPT Firm Team", 
+                $"<p>You have been joined into a firm on Wukala-GPT as a <b>{request.Role}</b>. Login to view your new workspace.</p>");
+        }
+        else
+        {
+            var newUser = new User
+            {
+                Email = request.Email,
+                FirmId = firmId,
+                StaffRole = request.Role,
+                IsActive = false,
+                Role = UserRole.Lawyer,
+                FirstName = request.Email.Split('@')[0], 
+                LastName = ""
+            };
+            _context.Users.Add(newUser);
+            await _emailService.SendEmailAsync(request.Email, "Invitation to join Wukala-GPT Firm Team", 
+                $"<p>You've been invited to join a firm on Wukala-GPT as a <b>{request.Role}</b>. Please complete your registration via the platform to activate your account.</p>");
+        }
+
+        await _context.SaveChangesAsync(default);
+
+        await LogActivityAsync(firmId, currentUserId, "Invited team member", request.Email, FirmActivityType.Other);
+    }
+
+    public async Task<List<StaffTaskDto>> GetTasksAsync(Guid firmId)
+    {
+        var tasks = await _context.StaffTasks.AsNoTracking()
+            .Include(t => t.AssignedToUser)
+            .Include(t => t.AssignedByUser)
+            .Where(t => t.FirmId == firmId)
+            .OrderByDescending(t => t.CreatedAt)
+            .ToListAsync();
+
+        return tasks.Select(t => new StaffTaskDto
+        {
+            Id = t.Id,
+            Title = t.Title,
+            AssignedTo = $"{t.AssignedToUser.FirstName} {t.AssignedToUser.LastName}".Trim(),
+            AssignedBy = $"{t.AssignedByUser.FirstName} {t.AssignedByUser.LastName}".Trim(),
+            DueDate = t.DueDate,
+            Priority = t.Priority.ToString(),
+            Status = t.Status == StaffTaskStatus.InProgress ? "In Progress" : t.Status.ToString(),
+            Type = t.Type.ToString()
+        }).ToList();
+    }
+
+    public async Task<StaffTaskDto> CreateTaskAsync(Guid firmId, Guid assignedBy, StaffTaskDto request)
+    {
+        // Clean name lookup matching for tasks
+        var cleanedName = request.AssignedTo.Replace("Adv. ", "").Trim();
+        var userToken = cleanedName.Split(' ').LastOrDefault() ?? "";
+        
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.FirmId == firmId && 
+                        (u.LastName.Contains(userToken) || u.FirstName.Contains(userToken))) 
+                   ?? await _context.Users.FirstOrDefaultAsync(u => u.FirmId == firmId);
+
+        if(user == null) throw new Exception("Assignee not found.");
+
+        var task = new StaffTask
+        {
+            FirmId = firmId,
+            Title = request.Title,
+            AssignedToUserId = user.Id,
+            AssignedByUserId = assignedBy,
+            DueDate = request.DueDate,
+            Priority = Enum.Parse<StaffTaskPriority>(request.Priority),
+            Status = StaffTaskStatus.Pending,
+            Type = Enum.Parse<StaffTaskType>(request.Type)
+        };
+
+        _context.StaffTasks.Add(task);
+        await _context.SaveChangesAsync(default);
+
+        await LogActivityAsync(firmId, assignedBy, "Assigned a task", task.Title, FirmActivityType.Other);
+
+        return request;
+    }
+
+    public async Task UpdateTaskStatusAsync(Guid taskId, Guid firmId, string newStatus)
+    {
+        var task = await _context.StaffTasks.FirstOrDefaultAsync(t => t.Id == taskId && t.FirmId == firmId);
+        if (task != null)
+        {
+            if (Enum.TryParse<StaffTaskStatus>(newStatus.Replace(" ", ""), out var status))
+            {
+                task.Status = status;
+                await _context.SaveChangesAsync(default);
+            }
+        }
+    }
+
+    public async Task<List<FirmActivityLogDto>> GetRecentActivityAsync(Guid firmId, int count = 20)
+    {
+        var logs = await _context.FirmActivityLogs.AsNoTracking()
+            .Include(l => l.User)
+            .Where(l => l.FirmId == firmId)
+            .OrderByDescending(l => l.CreatedAt)
+            .Take(count)
+            .ToListAsync();
+
+        return logs.Select(l => new FirmActivityLogDto
+        {
+            Id = l.Id,
+            Member = $"{l.User.FirstName} {l.User.LastName}".Trim(),
+            Action = l.Action,
+            Target = l.Target,
+            Timestamp = GetTimeAgo(l.CreatedAt),
+            Type = l.Type.ToString().ToLower() // simple mapping for UI icon mapping
+        }).ToList();
+    }
+
+    public async Task LogActivityAsync(Guid firmId, Guid userId, string action, string target, FirmActivityType type)
+    {
+        var log = new FirmActivityLog
+        {
+            FirmId = firmId,
+            UserId = userId,
+            Action = action,
+            Target = target,
+            Type = type
+        };
+        
+        _context.FirmActivityLogs.Add(log);
+        await _context.SaveChangesAsync(default);
+    }
+    
+    private string GetTimeAgo(DateTime dateTime)
+    {
+        var span = DateTime.UtcNow - dateTime;
+        if (span.TotalMinutes < 1) return "just now";
+        if (span.TotalHours < 1) return $"{(int)span.TotalMinutes} min ago";
+        if (span.TotalDays < 1) return $"{(int)span.TotalHours} hours ago";
+        if (span.TotalDays < 2) return "yesterday";
+        return $"{(int)span.TotalDays} days ago";
+    }
+}

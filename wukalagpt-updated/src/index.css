@@ -1,0 +1,315 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Core Background & Text */
+    --background: 0 0% 100%;
+    --foreground: 218 25% 15%;
+    
+    /* Primary Navy Blue - Trust & Authority */
+    --primary: 218 80% 18%;
+    --primary-foreground: 0 0% 100%;
+    --primary-muted: 218 45% 25%;
+    
+    /* Gold Accents - Premium & Luxury */
+    --gold: 45 100% 50%;
+    --gold-foreground: 218 25% 15%;
+    --gold-muted: 45 85% 60%;
+    
+    /* Cards & Surfaces */
+    --card: 0 0% 100%;
+    --card-foreground: 218 25% 15%;
+    --glass: 0 0% 100% / 0.8;
+    --glass-border: 218 20% 90%;
+    
+    /* Secondary Colors */
+    --secondary: 220 15% 96%;
+    --secondary-foreground: 218 25% 15%;
+    
+    /* Muted Elements */
+    --muted: 220 15% 96%;
+    --muted-foreground: 218 15% 45%;
+    
+    /* Accent Colors */
+    --accent: 220 15% 96%;
+    --accent-foreground: 218 25% 15%;
+    
+    /* Status Colors */
+    --destructive: 0 85% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 100% 50%;
+    --warning-foreground: 218 25% 15%;
+    
+    /* Borders & Inputs */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 218 100% 12%;
+    
+    /* Radius */
+    --radius: 0.75rem;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(218 80% 18%), hsl(218 75% 28%));
+    --gradient-gold: linear-gradient(135deg, hsl(45 100% 50%), hsl(40 100% 45%));
+    --gradient-glass: linear-gradient(135deg, hsl(0 0% 100% / 0.1), hsl(0 0% 100% / 0.05));
+    --gradient-hero: linear-gradient(135deg, hsl(218 80% 16%), hsl(218 75% 26%));
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 4px hsl(218 25% 15% / 0.04);
+    --shadow-md: 0 8px 25px hsl(218 25% 15% / 0.08);
+    --shadow-lg: 0 25px 50px hsl(218 25% 15% / 0.15);
+    --shadow-xl: 0 35px 60px hsl(218 25% 15% / 0.2);
+    --shadow-gold: 0 8px 32px hsl(45 100% 50% / 0.25);
+    --shadow-glow: 0 0 60px hsl(45 100% 50% / 0.15);
+    
+    /* Sidebar */
+    --sidebar-background: 218 25% 98%;
+    --sidebar-foreground: 218 25% 15%;
+    --sidebar-primary: 218 100% 12%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 15% 96%;
+    --sidebar-accent-foreground: 218 25% 15%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 218 100% 12%;
+  }
+
+  .dark {
+    /* Core Background & Text */
+    --background: 218 25% 8%;
+    --foreground: 0 0% 95%;
+    
+    /* Primary Navy Blue - Brighter for dark mode */
+    --primary: 218 85% 52%;
+    --primary-foreground: 218 25% 8%;
+    --primary-muted: 218 45% 35%;
+    
+    /* Gold Accents - Slightly muted for dark mode */
+    --gold: 45 85% 55%;
+    --gold-foreground: 218 25% 8%;
+    --gold-muted: 45 70% 65%;
+    
+    /* Cards & Surfaces */
+    --card: 218 20% 12%;
+    --card-foreground: 0 0% 95%;
+    --glass: 218 20% 12% / 0.8;
+    --glass-border: 218 15% 25%;
+    
+    /* Secondary Colors */
+    --secondary: 218 15% 18%;
+    --secondary-foreground: 0 0% 95%;
+    
+    /* Muted Elements */
+    --muted: 218 15% 18%;
+    --muted-foreground: 218 10% 65%;
+    
+    /* Accent Colors */
+    --accent: 218 15% 18%;
+    --accent-foreground: 0 0% 95%;
+    
+    /* Status Colors */
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 60% 50%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 85% 55%;
+    --warning-foreground: 218 25% 8%;
+    
+    /* Borders & Inputs */
+    --border: 218 15% 25%;
+    --input: 218 15% 25%;
+    --ring: 218 80% 60%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(218 85% 52%), hsl(218 75% 42%));
+    --gradient-gold: linear-gradient(135deg, hsl(45 85% 55%), hsl(40 85% 50%));
+    --gradient-glass: linear-gradient(135deg, hsl(218 20% 12% / 0.1), hsl(218 20% 12% / 0.05));
+    --gradient-hero: linear-gradient(135deg, hsl(218 25% 5%), hsl(218 40% 12%));
+    
+    /* Shadows */
+    --shadow-sm: 0 2px 4px hsl(218 25% 0% / 0.2);
+    --shadow-md: 0 8px 25px hsl(218 25% 0% / 0.3);
+    --shadow-lg: 0 25px 50px hsl(218 25% 0% / 0.4);
+    --shadow-xl: 0 35px 60px hsl(218 25% 0% / 0.5);
+    --shadow-gold: 0 8px 32px hsl(45 85% 55% / 0.35);
+    --shadow-glow: 0 0 60px hsl(45 85% 55% / 0.2);
+    
+    /* Sidebar */
+    --sidebar-background: 218 20% 10%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 218 85% 52%;
+    --sidebar-primary-foreground: 218 25% 8%;
+    --sidebar-accent: 218 15% 18%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 218 15% 25%;
+    --sidebar-ring: 218 85% 52%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', serif;
+  }
+}
+
+@layer components {
+  /* Glass morphism utility */
+  .glass {
+    background: hsl(var(--glass));
+    backdrop-filter: blur(20px);
+    border: 1px solid hsl(var(--glass-border));
+  }
+  
+  /* Premium button variants */
+  .btn-gold {
+    background: var(--gradient-gold);
+    color: hsl(var(--gold-foreground));
+    box-shadow: var(--shadow-gold);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .btn-gold:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg), var(--shadow-gold);
+  }
+  
+  /* Premium animations */
+  .animate-fade-in {
+    animation: fade-in 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .animate-slide-up {
+    animation: slide-up 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+  
+  /* Chat bubble styles */
+  .chat-bubble-user {
+    background: var(--gradient-primary);
+    color: hsl(var(--primary-foreground));
+    border-radius: 1.5rem 1.5rem 0.5rem 1.5rem;
+    box-shadow: var(--shadow-md);
+  }
+  
+  .chat-bubble-ai {
+    background: hsl(var(--card));
+    color: hsl(var(--card-foreground));
+    border: 1px solid hsl(var(--border));
+    border-radius: 1.5rem 1.5rem 1.5rem 0.5rem;
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+@layer utilities {
+  /* Custom shadows */
+  .shadow-premium {
+    box-shadow: var(--shadow-lg);
+  }
+  
+  .shadow-gold {
+    box-shadow: var(--shadow-gold);
+  }
+  
+  /* Custom text gradients */
+  .text-gradient-primary {
+    background: var(--gradient-primary);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  
+  .text-gradient-gold {
+    background: var(--gradient-gold);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+/* Keyframes */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes typing {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+/* Safe area for mobile bottom nav */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Skeleton shimmer animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--muted-foreground) / 0.1) 50%,
+    hsl(var(--muted)) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}

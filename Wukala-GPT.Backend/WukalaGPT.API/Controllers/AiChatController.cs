@@ -1,0 +1,115 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using WukalaGPT.Application.DTOs.AiChat;
+using WukalaGPT.Application.Interfaces;
+
+namespace WukalaGPT.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class AiChatController : ControllerBase
+{
+    private readonly IMizanAiChatService _aiChatService;
+
+    public AiChatController(IMizanAiChatService aiChatService)
+    {
+        _aiChatService = aiChatService;
+    }
+
+    private Guid GetCurrentUserId()
+    {
+        var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+            throw new UnauthorizedAccessException("User ID not found in token.");
+        return userId;
+    }
+
+    [HttpPost("sessions")]
+    public async Task<IActionResult> CreateSession([FromBody] string title)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var session = await _aiChatService.CreateSessionAsync(userId, title);
+            return Ok(session);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("sessions")]
+    public async Task<IActionResult> GetUserSessions()
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var sessions = await _aiChatService.GetUserSessionsAsync(userId);
+            return Ok(sessions);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("sessions/{sessionId}/messages")]
+    public async Task<IActionResult> GetSessionMessages(Guid sessionId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var messages = await _aiChatService.GetSessionMessagesAsync(userId, sessionId);
+            return Ok(messages);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("message")]
+    public async Task<IActionResult> SendMessage([FromBody] AiChatRequestDto request)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var response = await _aiChatService.SendMessageAsync(userId, request);
+            return Ok(response);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("sessions/{sessionId}")]
+    public async Task<IActionResult> DeleteSession(Guid sessionId)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            await _aiChatService.DeleteSessionAsync(userId, sessionId);
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+}

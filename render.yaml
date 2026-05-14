@@ -1,0 +1,72 @@
+version: "1"
+
+databases:
+  - name: wukala-db
+    databaseName: wukala_gpt
+    user: wukala_user
+    plan: starter
+
+services:
+  - type: web
+    name: wukala-backend
+    env: docker
+    dockerfilePath: Wukala-GPT.Backend/Dockerfile
+    dockerContext: Wukala-GPT.Backend
+    plan: starter
+    envVars:
+      - key: ConnectionStrings__DefaultConnection
+        fromDatabase:
+          name: wukala-db
+          property: connectionString
+      - key: ConnectionStrings__Redis
+        value: "redis://REDIS_URL_PROVIDED_BY_RENDER" # Please update with actual Render Redis internal URL
+      - key: JwtSettings__Secret
+        sync: false # Set in Render Dashboard
+      - key: Cloudinary__CloudName
+        sync: false # Set in Render Dashboard
+      - key: Cloudinary__ApiKey
+        sync: false # Set in Render Dashboard
+      - key: Cloudinary__ApiSecret
+        sync: false # Set in Render Dashboard
+      - key: Resend__ApiKey
+        sync: false # Set in Render Dashboard
+      - key: Cors__AllowedOrigins__0
+        value: "https://your-vercel-frontend-url.vercel.app" # Update this to your real Vercel frontend URL
+      - key: ASPNETCORE_ENVIRONMENT
+        value: "Production"
+
+  - type: web
+    name: mizan-api
+    env: docker
+    dockerfilePath: Mizan.AI/Dockerfile
+    dockerContext: Mizan.AI
+    plan: starter
+    disk:
+      name: mizan-data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: '["https://your-vercel-frontend-url.vercel.app", "https://wukala-backend.onrender.com"]' # Update to real URLs
+      - key: QDRANT_HOST
+        value: "qdrant-db" # Uses internal Render network DNS
+      - key: QDRANT_PORT
+        value: "6333"
+
+  - type: web
+    name: qdrant-db
+    env: docker
+    # We use a custom Dockerfile if needed, but Render can also run images directly from Docker Hub using `image` property in web services.
+    # Note: If `image` is not fully supported in all Render web service plans without a custom dockerfile,
+    # we can just use the public docker image. Render supports `image: qdrant/qdrant:latest` for web services.
+    image: qdrant/qdrant:latest
+    plan: starter
+    disk:
+      name: qdrant-data
+      mountPath: /qdrant/storage
+      sizeGB: 5
+    envVars:
+      - key: PORT
+        value: "6333" # Render routes external traffic to PORT. Qdrant HTTP uses 6333.

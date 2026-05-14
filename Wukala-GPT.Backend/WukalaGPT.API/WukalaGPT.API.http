@@ -1,0 +1,6 @@
+@WukalaGPT.API_HostAddress = http://localhost:5285
+
+GET {{WukalaGPT.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

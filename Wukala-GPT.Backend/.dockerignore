@@ -1,0 +1,13 @@
+**/.dockerignore
+**/.env
+**/.git
+**/.gitignore
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/TestResults
+**/docker-compose*
+**/docker-compose.override.yml
+**/appsettings.Development.json
+**/*.log
