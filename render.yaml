@@ -31,8 +31,13 @@ services:
         fromDatabase:
           name: wukala-db
           property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          type: pserv
+          name: wukala-redis
+          property: host
       - key: ConnectionStrings__Redis
-        value: "wukala-redis:6379,abortConnect=false"
+        value: "REPLACE_ME_REDIS_IN_CODE"
       - key: JwtSettings__Secret
         sync: false # Set in Render Dashboard
       - key: Cloudinary__CloudName
@@ -64,7 +69,10 @@ services:
       - key: ALLOWED_ORIGINS
         value: '["https://www.wukala-gpt.app", "http://wukala-backend:8080"]' 
       - key: QDRANT_HOST
-        value: "qdrant-db" # Uses internal Render network DNS
+        fromService:
+          type: pserv
+          name: qdrant-db
+          property: host
       - key: QDRANT_PORT
         value: "6333"
 

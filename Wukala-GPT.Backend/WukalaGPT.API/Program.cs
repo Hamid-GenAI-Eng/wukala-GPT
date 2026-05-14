@@ -21,17 +21,22 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddApplicationServices(builder.Configuration);
 builder.Services.AddInfrastructureServices(builder.Configuration);
 
+var redisHost = builder.Configuration["REDIS_HOST"];
+var redisConnectionString = !string.IsNullOrEmpty(redisHost) 
+    ? $"{redisHost}:6379,abortConnect=false" 
+    : builder.Configuration.GetConnectionString("Redis");
+
 builder.Services.AddStackExchangeRedisCache(options =>
 {
-    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+    options.Configuration = redisConnectionString;
     options.InstanceName = "WukalaGPT_";
 });
 
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp => 
-    ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")!));
+    ConnectionMultiplexer.Connect(redisConnectionString!));
 
 builder.Services.AddSignalR()
-    .AddStackExchangeRedis(builder.Configuration.GetConnectionString("Redis")!);
+    .AddStackExchangeRedis(redisConnectionString!);
 
 builder.Services.AddCors(options =>
 {
