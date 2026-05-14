@@ -5,6 +5,10 @@ databases:
     databaseName: wukala_gpt
     user: wukala_user
 
+redis:
+  - name: wukala-redis
+    ipAllowList: []
+
 services:
   - type: web
     name: wukala-backend
@@ -18,7 +22,10 @@ services:
           name: wukala-db
           property: connectionString
       - key: ConnectionStrings__Redis
-        value: "redis://REDIS_URL_PROVIDED_BY_RENDER" # Please update with actual Render Redis internal URL
+        fromService:
+          type: redis
+          name: wukala-redis
+          property: connectionString
       - key: JwtSettings__Secret
         sync: false # Set in Render Dashboard
       - key: Cloudinary__CloudName
