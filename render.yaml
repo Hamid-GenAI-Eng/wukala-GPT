@@ -31,11 +31,11 @@ services:
       - key: Resend__ApiKey
         sync: false # Set in Render Dashboard
       - key: Cors__AllowedOrigins__0
-        value: "https://your-vercel-frontend-url.vercel.app" # Update this to your real Vercel frontend URL
+        value: "https://www.wukala-gpt.app" 
       - key: ASPNETCORE_ENVIRONMENT
         value: "Production"
 
-  - type: web
+  - type: pserv
     name: mizan-api
     env: docker
     dockerfilePath: Mizan.AI/Dockerfile
@@ -49,18 +49,15 @@ services:
       - key: SECRET_KEY
         generateValue: true
       - key: ALLOWED_ORIGINS
-        value: '["https://your-vercel-frontend-url.vercel.app", "https://wukala-backend.onrender.com"]' # Update to real URLs
+        value: '["https://www.wukala-gpt.app", "http://wukala-backend:8080"]' 
       - key: QDRANT_HOST
         value: "qdrant-db" # Uses internal Render network DNS
       - key: QDRANT_PORT
         value: "6333"
 
-  - type: web
+  - type: pserv
     name: qdrant-db
     env: docker
-    # We use a custom Dockerfile if needed, but Render can also run images directly from Docker Hub using `image` property in web services.
-    # Note: If `image` is not fully supported in all Render web service plans without a custom dockerfile,
-    # we can just use the public docker image. Render supports `image: qdrant/qdrant:latest` for web services.
     image: qdrant/qdrant:latest
     plan: starter
     disk:
@@ -69,4 +66,4 @@ services:
       sizeGB: 5
     envVars:
       - key: PORT
-        value: "6333" # Render routes external traffic to PORT. Qdrant HTTP uses 6333.
+        value: "6333"
