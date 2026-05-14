@@ -79,6 +79,8 @@ services:
         sync: false # Set in Render Dashboard
       - key: HF_TOKEN
         sync: false # Optional: Set in Render Dashboard to prevent HuggingFace rate limits
+      - key: PORT
+        value: "8000"
 
   - type: pserv
     name: qdrant-db
