@@ -75,6 +75,10 @@ services:
           property: host
       - key: QDRANT_PORT
         value: "6333"
+      - key: GROQ_API_KEY
+        sync: false # Set in Render Dashboard
+      - key: HF_TOKEN
+        sync: false # Optional: Set in Render Dashboard to prevent HuggingFace rate limits
 
   - type: pserv
     name: qdrant-db
