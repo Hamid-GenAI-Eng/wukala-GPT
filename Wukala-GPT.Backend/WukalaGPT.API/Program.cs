@@ -57,7 +57,7 @@ builder.Services.AddHangfire(config => config
     .UseSimpleAssemblyNameTypeSerializer()
     .UseRecommendedSerializerSettings()
     .UsePostgreSqlStorage(config => 
-        config.UseNpgsqlConnection(builder.Configuration.GetConnectionString("DefaultConnection"))));
+        config.UseNpgsqlConnection(WukalaGPT.API.Extensions.InfrastructureServiceExtensions.GetPostgresConnectionString(builder.Configuration, "DefaultConnection"))));
 builder.Services.AddHangfireServer();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

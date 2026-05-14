@@ -8,11 +8,28 @@ namespace WukalaGPT.API.Extensions;
 
 public static class InfrastructureServiceExtensions
 {
+    public static string GetPostgresConnectionString(IConfiguration config, string name)
+    {
+        var connectionString = config.GetConnectionString(name);
+        if (string.IsNullOrEmpty(connectionString)) return string.Empty;
+
+        if (connectionString.StartsWith("postgres://"))
+        {
+            var uri = new Uri(connectionString);
+            var userInfo = uri.UserInfo.Split(':');
+            return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true;";
+        }
+
+        return connectionString;
+    }
+
     public static IServiceCollection AddInfrastructureServices(this IServiceCollection services, IConfiguration config)
     {
+        var dbConnectionString = GetPostgresConnectionString(config, "DefaultConnection");
+
         services.AddDbContext<WukalaDbContext>(options =>
         {
-            options.UseNpgsql(config.GetConnectionString("DefaultConnection"));
+            options.UseNpgsql(dbConnectionString);
         });
 
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<WukalaDbContext>());
