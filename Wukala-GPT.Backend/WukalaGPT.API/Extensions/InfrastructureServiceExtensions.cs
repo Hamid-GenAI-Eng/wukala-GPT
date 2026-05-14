@@ -13,11 +13,12 @@ public static class InfrastructureServiceExtensions
         var connectionString = config.GetConnectionString(name);
         if (string.IsNullOrEmpty(connectionString)) return string.Empty;
 
-        if (connectionString.StartsWith("postgres://"))
+        if (connectionString.StartsWith("postgres://", StringComparison.OrdinalIgnoreCase) || 
+            connectionString.StartsWith("postgresql://", StringComparison.OrdinalIgnoreCase))
         {
             var uri = new Uri(connectionString);
             var userInfo = uri.UserInfo.Split(':');
-            return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Require;Trust Server Certificate=true;";
+            return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]};SSL Mode=Prefer;Trust Server Certificate=true;";
         }
 
         return connectionString;
