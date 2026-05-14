@@ -4,7 +4,6 @@ databases:
   - name: wukala-db
     databaseName: wukala_gpt
     user: wukala_user
-    plan: starter
 
 services:
   - type: web
