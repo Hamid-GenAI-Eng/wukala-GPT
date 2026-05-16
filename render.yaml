@@ -52,8 +52,13 @@ services:
         value: "https://www.wukala-gpt.app" 
       - key: ASPNETCORE_ENVIRONMENT
         value: "Production"
+      - key: MizanAi__BaseUrl
+        fromService:
+          type: web
+          name: mizan-api
+          property: host
 
-  - type: pserv
+  - type: web
     name: mizan-api
     env: docker
     dockerfilePath: Mizan.AI/Dockerfile

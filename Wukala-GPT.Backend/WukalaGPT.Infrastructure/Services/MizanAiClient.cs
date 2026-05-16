@@ -22,6 +22,10 @@ public class MizanAiClient : IMizanAiClient
         _serviceTokenSecret = configuration["MizanAi:ServiceToken"] ?? "supersecretkey_mizan_ai_production_ready";
         
         var baseUrl = configuration["MizanAi:BaseUrl"] ?? "http://localhost:8000";
+        if (!baseUrl.StartsWith("http://") && !baseUrl.StartsWith("https://"))
+        {
+            baseUrl = "http://" + baseUrl;
+        }
         _httpClient.BaseAddress = new Uri(baseUrl);
     }
 
