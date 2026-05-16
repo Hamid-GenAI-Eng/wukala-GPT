@@ -58,14 +58,19 @@ function buildHeaders(contentType?: string, includeAuth: boolean = true): Header
  */
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    let errorMessage = `HTTP error! status: ${response.status}`;
+    let errorMessage = `HTTP error! status: ${response.status} at ${response.url}`;
     let data: unknown = undefined;
 
     try {
-      data = await response.json();
-      errorMessage = (data as Record<string, unknown>)?.message as string || errorMessage;
+      const text = await response.text();
+      try {
+        data = JSON.parse(text);
+        errorMessage = (data as Record<string, unknown>)?.message as string || errorMessage;
+      } catch {
+        errorMessage = text || errorMessage;
+      }
     } catch {
-      errorMessage = await response.text() || errorMessage;
+      // Ignore text reading errors
     }
 
     throw new ApiError(errorMessage, response.status, data);
