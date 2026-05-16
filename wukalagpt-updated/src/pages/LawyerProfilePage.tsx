@@ -35,7 +35,14 @@ const LawyerProfilePage = () => {
     education: '',
     barCouncil: '',
     license: '',
-    hourlyRate: '0'
+    hourlyRate: '0',
+    casesWon: '0',
+    activeCases: '0',
+    responseTime: 'N/A',
+    experiences: [] as any[],
+    educations: [] as any[],
+    specialities: [] as any[],
+    profilePhotoUrl: ''
   });
 
   const [status, setStatus] = useState<number>(0);
@@ -48,19 +55,34 @@ const LawyerProfilePage = () => {
         await refreshUser();
         const data = await api.getLawyerMe();
         setProfileData({
-          name: data.fullName,
-          email: data.email,
-          phone: data.phoneNo,
-          city: data.city,
+          name: data.fullName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'User',
+          email: data.email || '',
+          phone: data.phoneNumber || data.phoneNo || '',
+          city: data.city || '',
           bio: data.bio || '',
-          specialization: data.degreeTitle || '',
-          experience: '',
+          specialization: data.degreeTitle || data.specialization || '',
+          experience: data.yearsOfExperience?.toString() || '0',
           education: data.university || '',
-          barCouncil: '',
-          license: data.barCouncilNumber || '',
-          hourlyRate: '0'
+          barCouncil: data.barAssociation || '',
+          license: data.barCouncilNumber || data.licenseNumber || '',
+          hourlyRate: data.consultationFee?.toString() || '0',
+          casesWon: data.casesWon?.toString() || '0',
+          activeCases: data.activeCases?.toString() || '0',
+          responseTime: data.responseTime || 'N/A',
+          experiences: data.experiences || [],
+          educations: data.educations || [],
+          specialities: data.specialities || [],
+          profilePhotoUrl: data.profilePhotoUrl || ''
         });
-        setStatus(Number(data.status));
+        let finalStatus = 0;
+        const vStatus = data.verificationStatus ?? data.status;
+        if (typeof vStatus === 'string') {
+          if (vStatus.toLowerCase() === 'approved') finalStatus = 1;
+          else if (vStatus.toLowerCase() === 'rejected') finalStatus = 2;
+        } else {
+          finalStatus = Number(vStatus) || 0;
+        }
+        setStatus(finalStatus);
       } catch (err) {
         console.error('Failed to fetch profile:', err);
       } finally {
@@ -77,15 +99,35 @@ const LawyerProfilePage = () => {
   const handleSave = async () => {
     setIsEditing(false);
     try {
+      const nameParts = profileData.name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
       await api.updateLawyerMe({
-        fullName: profileData.name,
-        phoneNo: profileData.phone,
+        firstName,
+        lastName,
+        phoneNumber: profileData.phone,
         city: profileData.city,
-        chamberAddress: '',
-        bio: profileData.bio
+        bio: profileData.bio,
+        consultationFee: parseFloat(profileData.hourlyRate) || 0,
+        yearsOfExperience: parseInt(profileData.experience) || 0
       });
     } catch (err) {
       console.error('Update failed:', err);
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const formData = new FormData();
+      formData.append('photo', file);
+      try {
+        const response = await api.uploadLawyerPhoto(formData);
+        setProfileData(prev => ({ ...prev, profilePhotoUrl: response.photoUrl }));
+      } catch (err) {
+        console.error('Failed to upload photo:', err);
+      }
     }
   };
 
@@ -130,16 +172,34 @@ const LawyerProfilePage = () => {
               <CardContent className="p-4 sm:p-6">
                 <div className="text-center">
                   <div className="relative mb-4">
-                    <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto bg-gradient-primary rounded-full flex items-center justify-center text-white text-xl sm:text-2xl font-bold">
-                      {profileData.name.split(' ').map(n => n[0]).join('')}
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 mx-auto bg-gradient-primary rounded-full flex items-center justify-center text-white text-xl sm:text-2xl font-bold overflow-hidden">
+                      {profileData.profilePhotoUrl ? (
+                        <img src={profileData.profilePhotoUrl} alt="Profile" className="w-full h-full object-cover" />
+                      ) : (
+                        profileData.name.split(' ').map(n => n[0]).join('')
+                      )}
                     </div>
                     {isEditing && (
-                      <Button
-                        size="sm"
-                        className="absolute bottom-0 right-1/2 translate-x-1/2 translate-y-2 w-8 h-8 rounded-full p-0"
-                      >
-                        <Camera className="w-4 h-4" />
-                      </Button>
+                      <div className="absolute bottom-0 right-1/2 translate-x-1/2 translate-y-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoUpload}
+                          className="hidden"
+                          id="profile-photo-upload"
+                        />
+                        <label htmlFor="profile-photo-upload">
+                          <Button
+                            size="sm"
+                            className="w-8 h-8 rounded-full p-0 cursor-pointer"
+                            asChild
+                          >
+                            <span>
+                              <Camera className="w-4 h-4" />
+                            </span>
+                          </Button>
+                        </label>
+                      </div>
                     )}
                   </div>
                   
@@ -227,24 +287,24 @@ const LawyerProfilePage = () => {
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Cases Won</span>
-                  <span className="font-semibold">142</span>
+                  <span className="font-semibold">{profileData.casesWon}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Active Cases</span>
-                  <span className="font-semibold">18</span>
+                  <span className="font-semibold">{profileData.activeCases}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-muted-foreground">Response Time</span>
-                  <span className="font-semibold">2 hours</span>
+                  <span className="font-semibold">{profileData.responseTime}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Hourly Rate</span>
+                  <span className="text-sm text-muted-foreground">Consultation Fee</span>
                   {isEditing ? (
                     <Input
                       value={profileData.hourlyRate}
                       onChange={(e) => handleInputChange('hourlyRate', e.target.value)}
-                      className="w-20 text-right text-sm"
-                      placeholder="Rate"
+                      className="w-24 text-right text-sm"
+                      placeholder="Fee"
                     />
                   ) : (
                     <span className="font-semibold">PKR {profileData.hourlyRate}</span>
@@ -292,11 +352,13 @@ const LawyerProfilePage = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline">Corporate Law</Badge>
-                      <Badge variant="outline">Contract Law</Badge>
-                      <Badge variant="outline">Mergers & Acquisitions</Badge>
-                      <Badge variant="outline">Regulatory Compliance</Badge>
-                      <Badge variant="outline">Commercial Litigation</Badge>
+                      {profileData.specialities && profileData.specialities.length > 0 ? (
+                        profileData.specialities.map((spec: any, idx: number) => (
+                          <Badge key={idx} variant="outline">{spec.name || spec}</Badge>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No specializations added yet.</p>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -311,19 +373,20 @@ const LawyerProfilePage = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="border-l-2 border-primary pl-4">
-                      <h4 className="font-semibold">Senior Partner</h4>
-                      <p className="text-sm text-muted-foreground">Khan & Associates Law Firm</p>
-                      <p className="text-xs text-muted-foreground">2020 - Present</p>
-                      <p className="text-sm mt-2">Leading corporate law division with focus on M&A transactions and regulatory matters.</p>
-                    </div>
-                    
-                    <div className="border-l-2 border-primary pl-4">
-                      <h4 className="font-semibold">Associate Lawyer</h4>
-                      <p className="text-sm text-muted-foreground">Legal Solutions LLP</p>
-                      <p className="text-xs text-muted-foreground">2016 - 2020</p>
-                      <p className="text-sm mt-2">Specialized in commercial contracts and litigation matters.</p>
-                    </div>
+                    {profileData.experiences && profileData.experiences.length > 0 ? (
+                      profileData.experiences.map((exp: any, idx: number) => (
+                        <div key={idx} className="border-l-2 border-primary pl-4">
+                          <h4 className="font-semibold">{exp.role}</h4>
+                          <p className="text-sm text-muted-foreground">{exp.firmCompany}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(exp.startDate).getFullYear()} - {exp.isCurrent ? 'Present' : (exp.endDate ? new Date(exp.endDate).getFullYear() : '')}
+                          </p>
+                          {exp.shortBio && <p className="text-sm mt-2">{exp.shortBio}</p>}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No experience details added yet.</p>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>

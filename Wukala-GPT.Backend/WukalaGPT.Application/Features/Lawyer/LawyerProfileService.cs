@@ -100,8 +100,16 @@ public class LawyerProfileService : ILawyerProfileService
 
     public async Task<LawyerProfileDto> UpdateProfileAsync(Guid lawyerUserId, UpdateLawyerProfileDto dto)
     {
-        var lawyer = await _context.LawyerProfiles.FirstOrDefaultAsync(l => l.UserId == lawyerUserId);
+        var lawyer = await _context.LawyerProfiles
+            .Include(l => l.User)
+            .FirstOrDefaultAsync(l => l.UserId == lawyerUserId);
+            
         if (lawyer == null) throw new Exception("Lawyer profile not found.");
+
+        if (!string.IsNullOrEmpty(dto.FirstName)) lawyer.User.FirstName = dto.FirstName;
+        if (!string.IsNullOrEmpty(dto.LastName)) lawyer.User.LastName = dto.LastName;
+        if (!string.IsNullOrEmpty(dto.PhoneNumber)) lawyer.User.PhoneNumber = dto.PhoneNumber;
+        if (!string.IsNullOrEmpty(dto.City)) lawyer.User.City = dto.City;
 
         lawyer.YearsOfExperience = dto.YearsOfExperience;
         lawyer.Bio = dto.Bio;
