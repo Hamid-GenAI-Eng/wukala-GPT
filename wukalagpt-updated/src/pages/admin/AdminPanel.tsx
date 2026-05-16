@@ -419,7 +419,15 @@ const AdminPanel = () => {
                                         <div className="bg-background p-2 rounded-lg"><asset.icon className="w-5 h-5 text-primary" /></div>
                                         <p className="text-sm font-semibold">{asset.label}</p>
                                       </div>
-                                      <Button variant="secondary" size="sm" className="rounded-lg h-8">Access Asset</Button>
+                                      <Button 
+                                        variant="secondary" 
+                                        size="sm" 
+                                        className="rounded-lg h-8"
+                                        disabled={!asset.value}
+                                        onClick={() => asset.value && window.open(asset.value, '_blank')}
+                                      >
+                                        {asset.value ? 'Access Asset' : 'Not Provided'}
+                                      </Button>
                                     </div>
                                   ))}
                                 </TabsContent>

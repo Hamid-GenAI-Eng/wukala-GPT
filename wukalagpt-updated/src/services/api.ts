@@ -355,10 +355,18 @@ export const api = {
    * Get list of lawyer applications (Admin)
    */
   getLawyers: async (status?: number) => {
-    return request<LawyerApplication[]>('/Admin/lawyers', {
+    const res = await request<any[]>('/Admin/lawyers', {
       method: 'GET',
       params: status !== undefined ? { status } : undefined,
     }, true);
+    return res.map(app => ({
+      ...app,
+      fullName: app.fullName || `${app.firstName || ''} ${app.lastName || ''}`.trim() || 'Unnamed',
+      degree: app.degree || app.degreeFileUrl,
+      introVideo: app.introVideo || app.introVideoUrl,
+      status: app.status ?? app.verificationStatus,
+      submittedAt: app.submittedAt || app.createdAt || new Date().toISOString(),
+    })) as LawyerApplication[];
   },
 
   /**
@@ -408,9 +416,20 @@ export const api = {
    * Get platform statistics (Admin)
    */
   getAdminStats: async () => {
-    return request<AdminStats>('/Admin/stats', {
+    const res = await request<any>('/Admin/stats', {
       method: 'GET',
     }, true);
+    
+    return {
+      totalUsers: res.totalUsers ?? res.TotalUsers ?? ((res.totalActiveUsers || 0) + (res.totalSuspendedUsers || 0)),
+      totalLawyers: res.totalLawyers ?? res.TotalLawyers ?? 0,
+      totalClients: res.totalClients ?? res.TotalClients ?? 0,
+      pendingVerifications: res.pendingVerifications ?? res.PendingVerifications ?? res.pendingLawyerApprovals ?? 0,
+      approvedVerifications: res.approvedVerifications ?? res.ApprovedVerifications ?? 0,
+      rejectedVerifications: res.rejectedVerifications ?? res.RejectedVerifications ?? 0,
+      activeChats: res.activeChats ?? res.ActiveChats ?? 0,
+      totalDocuments: res.totalDocuments ?? res.TotalDocuments ?? 0,
+    } as AdminStats;
   },
 
   // ==================== DOCUMENT ENDPOINTS ====================

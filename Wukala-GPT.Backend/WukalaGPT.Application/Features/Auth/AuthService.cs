@@ -189,7 +189,7 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync(default);
 
         // Ideally this URL comes from config (frontend URL)
-        var resetLink = $"https://app.wukalagpt.com/reset-password?token={token}&email={user.Email}";
+        var resetLink = $"https://www.wukala-gpt.app/reset-password?token={token}&email={user.Email}";
         BackgroundJob.Enqueue(() => _emailService.SendEmailAsync(user.Email, "Reset Password - Wukala GPT", $"Click <a href='{resetLink}'>here</a> to reset your password."));
     }
 
