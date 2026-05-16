@@ -48,6 +48,8 @@ services:
         sync: false # Set in Render Dashboard
       - key: Resend__ApiKey
         sync: false # Set in Render Dashboard
+      - key: Resend__FromEmail
+        value: "no-reply@codeenvisiontechnologies.com"
       - key: Cors__AllowedOrigins__0
         value: "https://www.wukala-gpt.app" 
       - key: ASPNETCORE_ENVIRONMENT
