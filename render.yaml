@@ -63,7 +63,7 @@ services:
     env: docker
     dockerfilePath: Mizan.AI/Dockerfile
     dockerContext: Mizan.AI
-    plan: pro_plus
+    plan: "pro plus"
     disk:
       name: mizan-data
       mountPath: /app/data
