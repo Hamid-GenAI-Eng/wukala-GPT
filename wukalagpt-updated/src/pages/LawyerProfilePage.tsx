@@ -623,8 +623,9 @@ const LawyerProfilePage = () => {
           {/* Right Column - Detailed Information */}
           <div className="lg:col-span-2">
             <Tabs defaultValue="about" className="space-y-4 sm:space-y-6">
-              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto gap-1">
+              <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto gap-1">
                 <TabsTrigger value="about" className="text-xs sm:text-sm py-2">About</TabsTrigger>
+                <TabsTrigger value="specializations" className="text-xs sm:text-sm py-2">Specializations</TabsTrigger>
                 <TabsTrigger value="experience" className="text-xs sm:text-sm py-2">Experience</TabsTrigger>
                 <TabsTrigger value="education" className="text-xs sm:text-sm py-2">Education</TabsTrigger>
                 <TabsTrigger value="settings" className="text-xs sm:text-sm py-2">Settings</TabsTrigger>
@@ -706,6 +707,89 @@ const LawyerProfilePage = () => {
                         )}
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* SPECIALIZATIONS TAB */}
+              <TabsContent value="specializations" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Award className="w-5 h-5 text-primary animate-pulse" />
+                        <span>Practice Specializations Form</span>
+                      </div>
+                      <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
+                        {selectedSpecIds.length} Selected
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 text-sm text-foreground flex flex-col gap-1.5 leading-relaxed">
+                      <span className="font-bold text-primary">Interactive Specialization Practice Form</span>
+                      <span className="text-muted-foreground text-xs">Manage the legal practice areas and domains that appear on your public marketplace profile. Potential clients will filter and search for you based on these certified fields.</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-2">
+                      {allSpecialities.map((spec) => {
+                        const isChecked = selectedSpecIds.includes(spec.id);
+                        return (
+                          <div
+                            key={spec.id}
+                            onClick={() => handleSpecialityToggle(spec.id)}
+                            className={`flex items-start gap-3.5 p-4 rounded-xl border text-sm cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99] select-none ${
+                              isChecked 
+                                ? "bg-primary/5 border-primary shadow-sm text-foreground" 
+                                : "bg-card border-border hover:bg-muted/40 text-muted-foreground"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              readOnly
+                              className="mt-0.5 h-4.5 w-4.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                            />
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              <span className={`font-semibold tracking-tight transition-colors ${isChecked ? 'text-primary' : 'text-foreground'}`}>
+                                {spec.name}
+                              </span>
+                              <span className="text-[11px] leading-tight text-muted-foreground/90 font-medium truncate">
+                                {spec.description || 'Certified legal domain field'}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t border-border/50">
+                      <Button 
+                        onClick={async () => {
+                          try {
+                            setIsLoading(true);
+                            await api.updateSpecialities(selectedSpecIds);
+                            await fetchProfile();
+                            toast({
+                              title: "Success",
+                              description: "Specializations form updated successfully.",
+                            });
+                          } catch (err: any) {
+                            toast({
+                              title: "Error",
+                              description: err.message || "Failed to update specializations.",
+                              variant: "destructive"
+                            });
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }}
+                        className="bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20 min-w-[150px]"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        Update Form
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>

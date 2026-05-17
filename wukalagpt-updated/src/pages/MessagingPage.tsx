@@ -17,7 +17,15 @@ import {
   Clock,
   CheckCheck,
   Loader2,
-  MessageCircle
+  MessageCircle,
+  Mic,
+  Trash2,
+  Play,
+  Pause,
+  Volume2,
+  Square,
+  FileText,
+  Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api, Conversation, ChatMessage } from '@/services/api';
@@ -46,6 +54,93 @@ const formatSafeDistanceNoSuffix = (dateString?: string) => {
   } catch {
     return '';
   }
+};
+
+const VoicePlayer = ({ url, isMine }: { url: string; isMine: boolean }) => {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+  };
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const onLoadedMetadata = () => setDuration(audio.duration);
+    const onEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('timeupdate', onTimeUpdate);
+    audio.addEventListener('loadedmetadata', onLoadedMetadata);
+    audio.addEventListener('ended', onEnded);
+
+    return () => {
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('timeupdate', onTimeUpdate);
+      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
+      audio.removeEventListener('ended', onEnded);
+    };
+  }, [url]);
+
+  const formatTime = (sec: number) => {
+    if (isNaN(sec)) return '0:00';
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  return (
+    <div className={cn(
+      "flex items-center gap-3 p-2.5 rounded-xl min-w-[210px] sm:min-w-[240px] bg-card/60 border backdrop-blur-sm shadow-sm select-none",
+      isMine ? "border-primary/20 text-foreground" : "border-border text-foreground"
+    )}>
+      <audio ref={audioRef} src={url} preload="metadata" />
+      <Button
+        onClick={togglePlay}
+        size="icon"
+        variant="ghost"
+        className={cn(
+          "h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-transform active:scale-95",
+          isMine ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-primary/10 text-primary hover:bg-primary/20"
+        )}
+      >
+        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
+      </Button>
+
+      <div className="flex-1 flex flex-col gap-1 min-w-0">
+        <div className="h-1.5 w-full bg-muted/40 rounded-full overflow-hidden relative mt-1">
+          <div 
+            className="h-full bg-primary rounded-full transition-all duration-100"
+            style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between text-[10px] text-muted-foreground/80 font-bold">
+          <span>{formatTime(currentTime)}</span>
+          <span className="flex items-center gap-1 uppercase font-extrabold text-[8px] tracking-wider">
+            <Volume2 className="h-2.5 w-2.5" /> Voice
+          </span>
+          <span>{formatTime(duration || 0)}</span>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default function MessagingPage() {
@@ -168,27 +263,142 @@ export default function MessagingPage() {
     api.markAsRead(conv.id);
   };
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedConversation || !user) return;
-    
-    setIsSending(true);
-    const content = newMessage.trim();
-    setNewMessage('');
+  // Voice Recording States
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const timerRef = useRef<any>(null);
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(chunks, { type: 'audio/webm' });
+        if (audioBlob.size < 1000) {
+          toast.error("Audio recording was too short.");
+          return;
+        }
+
+        setIsSending(true);
+        const file = new File([audioBlob], `voice-message-${Date.now()}.webm`, { type: 'audio/webm' });
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+          const response = await api.uploadProofDocument(formData);
+          if (response && response.url) {
+            const messageContent = `🎤 Voice Message|${response.url}`;
+            await submitMessage(messageContent);
+            toast.success("Voice message sent successfully.");
+          }
+        } catch (err) {
+          console.error("Failed to send voice message:", err);
+          toast.error("Failed to send voice message.");
+        } finally {
+          setIsSending(false);
+        }
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+      setRecordingDuration(0);
+
+      timerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+
+    } catch (err) {
+      console.error("Voice recording access denied:", err);
+      toast.error("Microphone access is required to record voice messages.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsRecording(false);
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.ondataavailable = null;
+      mediaRecorder.stop();
+      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsRecording(false);
+    setRecordingDuration(0);
+    toast.info("Recording cancelled.");
+  };
+
+  const formatDuration = (sec: number) => {
+    const mins = Math.floor(sec / 60);
+    const secs = sec % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedConversation) return;
+
+    setIsSending(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await api.uploadProofDocument(formData);
+      if (response && response.url) {
+        const messageContent = `📄 Shared Document: ${file.name}|${response.url}`;
+        await submitMessage(messageContent);
+        toast.success("Document shared successfully.");
+      }
+    } catch (err) {
+      console.error("Document upload failed:", err);
+      toast.error("Failed to upload document.");
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const submitMessage = async (content: string) => {
+    if (!content.trim() || !selectedConversation || !user) return;
+    
     try {
       if (selectedConversation.id.startsWith('temp-')) {
         throw new Error("Temporary conversation");
       }
-      // Try SignalR first for "real-time" feel
       await chatService.sendMessage(selectedConversation.targetUserId, content);
-      
+      await fetchConversations();
     } catch (error) {
-      // Fallback to HTTP API
       try {
         const sentMsg = await api.sendMessage(selectedConversation.targetUserId, content);
         if (selectedConversation.id.startsWith('temp-')) {
-          await fetchConversations();
           const updatedConvs = await api.getConversations();
+          setConversations(updatedConvs);
           const realConv = updatedConvs.find(c => c.targetUserId === selectedConversation.targetUserId);
           if (realConv) {
             setSelectedConversation(realConv);
@@ -200,11 +410,61 @@ export default function MessagingPage() {
         }
       } catch (httpError) {
         toast.error("Failed to send message");
-        setNewMessage(content); // Restore message
       }
-    } finally {
-      setIsSending(false);
     }
+  };
+
+  const handleSendMessage = async () => {
+    if (!newMessage.trim()) return;
+    setIsSending(true);
+    const content = newMessage.trim();
+    setNewMessage('');
+    await submitMessage(content);
+    setIsSending(false);
+  };
+
+  const renderMessageContent = (content: string, isMine: boolean) => {
+    if (content.startsWith("📄 Shared Document:")) {
+      const raw = content.replace("📄 Shared Document:", "").trim();
+      const parts = raw.split("|");
+      const fileName = parts[0] || "Shared Document";
+      const fileUrl = parts[1] || "";
+
+      return (
+        <div className={cn(
+          "flex items-center gap-3.5 p-3 rounded-xl border bg-card/60 backdrop-blur-sm min-w-[210px] md:min-w-[260px] hover:shadow-md transition-all duration-300 select-none text-foreground",
+          isMine ? "border-primary/20" : "border-border"
+        )}>
+          <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
+            <FileText className="h-4.5 w-4.5" />
+          </div>
+          <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+            <span className="font-semibold text-xs truncate leading-tight">
+              {fileName}
+            </span>
+            <span className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground/80">
+              Shared Document File
+            </span>
+          </div>
+          <a
+            href={fileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="h-8 w-8 rounded-lg bg-primary hover:bg-primary/90 text-white flex items-center justify-center flex-shrink-0 transition-transform active:scale-95"
+            title="Download Document"
+          >
+            <Download className="h-4 w-4" />
+          </a>
+        </div>
+      );
+    }
+
+    if (content.startsWith("🎤 Voice Message|")) {
+      const audioUrl = content.replace("🎤 Voice Message|", "").trim();
+      return <VoicePlayer url={audioUrl} isMine={isMine} />;
+    }
+
+    return <p className="leading-relaxed whitespace-pre-wrap break-words">{content}</p>;
   };
 
   const scrollToBottom = () => {
@@ -416,14 +676,18 @@ export default function MessagingPage() {
                     )}
                     
                     <div className="flex flex-col">
-                      <div className={cn(
-                        "p-3 px-4 rounded-2xl text-sm shadow-sm transition-all animate-in fade-in slide-in-from-bottom-1",
-                        isMine 
-                          ? 'bg-primary text-primary-foreground rounded-br-none' 
-                          : 'bg-card border border-border/50 text-foreground rounded-bl-none'
-                      )}>
-                        <p className="leading-relaxed">{message.content}</p>
-                      </div>
+                      {message.content.startsWith("📄 Shared Document:") || message.content.startsWith("🎤 Voice Message|") ? (
+                        renderMessageContent(message.content, isMine)
+                      ) : (
+                        <div className={cn(
+                          "p-3 px-4 rounded-2xl text-sm shadow-sm transition-all animate-in fade-in slide-in-from-bottom-1",
+                          isMine 
+                            ? 'bg-primary text-primary-foreground rounded-br-none' 
+                            : 'bg-card border border-border/50 text-foreground rounded-bl-none'
+                        )}>
+                          <p className="leading-relaxed">{message.content}</p>
+                        </div>
+                      )}
                       
                       <div className={cn(
                         "flex items-center gap-1.5 mt-1 px-1",
@@ -448,35 +712,91 @@ export default function MessagingPage() {
 
             {/* Message Input */}
             <div className="p-4 pb-6 border-t border-border/50 bg-card/50 backdrop-blur-md">
-              <div className="max-w-4xl mx-auto flex items-end space-x-3">
-                <Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl bg-background border border-border/50 text-muted-foreground hover:text-primary">
-                  <Paperclip className="h-5 w-5" />
-                </Button>
-                
-                <div className="flex-1 relative">
-                  <Input
-                    placeholder="Describe your legal query..."
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="h-11 bg-background border-border/50 focus:ring-primary/20 rounded-xl pr-12"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-9 w-9 text-muted-foreground hover:text-primary"
-                  >
-                    <Smile className="h-5 w-5" />
-                  </Button>
-                </div>
-                
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!newMessage.trim() || isSending}
-                  className="h-11 w-11 rounded-xl bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 transition-all active:scale-95"
-                >
-                  {isSending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                </Button>
+              <div className="max-w-4xl mx-auto flex items-center space-x-3">
+                {isRecording ? (
+                  <div className="flex-1 flex items-center justify-between bg-destructive/5 border border-destructive/25 rounded-xl px-4 h-11 select-none animate-in fade-in zoom-in-95 duration-200">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 bg-destructive rounded-full animate-ping" />
+                      <span className="text-xs font-bold text-destructive uppercase tracking-widest flex items-center gap-1">
+                        Recording Voice ({formatDuration(recordingDuration)})
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        onClick={cancelRecording}
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 rounded-lg font-bold text-xs"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Cancel
+                      </Button>
+                      <Button
+                        onClick={stopRecording}
+                        variant="default"
+                        size="sm"
+                        className="bg-destructive hover:bg-destructive/95 text-white h-8 rounded-lg font-bold text-xs px-3 shadow-md shadow-destructive/15"
+                      >
+                        <Square className="h-3 w-3 mr-1.5" /> Stop & Send
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="file"
+                      id="chat-file-upload"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <label htmlFor="chat-file-upload">
+                      <Button
+                        asChild
+                        variant="ghost"
+                        size="icon"
+                        className="h-11 w-11 rounded-xl bg-background border border-border/50 text-muted-foreground hover:text-primary cursor-pointer transition-transform active:scale-95 flex items-center justify-center"
+                      >
+                        <span>
+                          <Paperclip className="h-5 w-5" />
+                        </span>
+                      </Button>
+                    </label>
+                    
+                    <div className="flex-1 relative">
+                      <Input
+                        placeholder="Describe your legal query..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        className="h-11 bg-background border-border/50 focus:ring-primary/20 rounded-xl pr-12"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 -translate-y-1/2 h-9 w-9 text-muted-foreground hover:text-primary rounded-lg"
+                      >
+                        <Smile className="h-5 w-5" />
+                      </Button>
+                    </div>
+
+                    <Button
+                      onClick={startRecording}
+                      variant="ghost"
+                      size="icon"
+                      className="h-11 w-11 rounded-xl bg-background border border-border/50 text-muted-foreground hover:text-primary hover:bg-primary/5 transition-transform active:scale-95 flex items-center justify-center"
+                      title="Record Voice Message"
+                    >
+                      <Mic className="h-5 w-5" />
+                    </Button>
+                    
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={!newMessage.trim() || isSending}
+                      className="h-11 w-11 rounded-xl bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 transition-all active:scale-95 flex items-center justify-center"
+                    >
+                      {isSending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+                    </Button>
+                  </>
+                )}
               </div>
               <p className="text-[10px] text-center text-muted-foreground mt-3 uppercase tracking-tighter font-extrabold opacity-40">
                 End-to-End Encryption Enabled • AI Legal Nexus Secure Chat
