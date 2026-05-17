@@ -3,6 +3,7 @@ using System;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WukalaGPT.Infrastructure.Persistence;
@@ -12,9 +13,11 @@ using WukalaGPT.Infrastructure.Persistence;
 namespace WukalaGPT.Infrastructure.Migrations
 {
     [DbContext(typeof(WukalaDbContext))]
-    partial class WukalaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260517150232_AddProofUrlToExperience")]
+    partial class AddProofUrlToExperience
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

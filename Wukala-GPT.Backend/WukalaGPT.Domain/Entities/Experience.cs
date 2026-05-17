@@ -13,4 +13,6 @@ public class Experience
     public DateTime? EndDate { get; set; }
     public bool IsCurrent { get; set; }
     public string? ShortBio { get; set; }
+    
+    public string? ProofUrl { get; set; }
 }

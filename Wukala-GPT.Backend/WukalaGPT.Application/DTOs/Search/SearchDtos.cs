@@ -36,6 +36,11 @@ public class LawyerSearchItemDto
     
     // Extracted Algorithm Score
     public double RelevanceScore { get; set; }
+
+    public string Bio { get; set; } = string.Empty;
+    public string DegreeTitle { get; set; } = string.Empty;
+    public string University { get; set; } = string.Empty;
+    public string Specialization { get; set; } = string.Empty;
 }
 
 public class LawyerClientViewDto

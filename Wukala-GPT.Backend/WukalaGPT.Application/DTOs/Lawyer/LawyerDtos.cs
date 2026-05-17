@@ -85,6 +85,7 @@ public class ExperienceDto
     public DateTime? EndDate { get; set; }
     public bool IsCurrent { get; set; }
     public string? ShortBio { get; set; }
+    public string? ProofUrl { get; set; }
 }
 
 public class UpdateExperienceDto
@@ -95,6 +96,7 @@ public class UpdateExperienceDto
     public DateTime? EndDate { get; set; }
     public bool IsCurrent { get; set; }
     public string? ShortBio { get; set; }
+    public string? ProofUrl { get; set; }
 }
 
 public class EducationDto
@@ -111,6 +113,7 @@ public class UpdateEducationDto
     public string InstituteName { get; set; } = string.Empty;
     public string DegreeName { get; set; } = string.Empty;
     public string Grades { get; set; } = string.Empty;
+    public string? DegreeImageUrl { get; set; }
 }
 
 public class SpecialityDto

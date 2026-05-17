@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { 
   User, 
   Mail, 
@@ -18,10 +19,17 @@ import {
   Award,
   Edit3,
   Save,
-  Camera
+  Camera,
+  Trash2,
+  Plus,
+  FileText,
+  CheckCircle,
+  ExternalLink,
+  Loader2,
+  GraduationCap
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import api from '@/services/api';
+import api, { SpecialityResponse, ExperienceResponse, EducationResponse } from '@/services/api';
 import { useToast } from "@/hooks/use-toast";
 
 const LawyerProfilePage = () => {
@@ -43,8 +51,8 @@ const LawyerProfilePage = () => {
     casesWon: '0',
     activeCases: '0',
     responseTime: 'N/A',
-    experiences: [] as any[],
-    educations: [] as any[],
+    experiences: [] as ExperienceResponse[],
+    educations: [] as EducationResponse[],
     specialities: [] as any[],
     profilePhotoUrl: '',
     rating: 0,
@@ -56,56 +64,89 @@ const LawyerProfilePage = () => {
 
   const [status, setStatus] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [allSpecialities, setAllSpecialities] = useState<SpecialityResponse[]>([]);
+  const [selectedSpecIds, setSelectedSpecIds] = useState<string[]>([]);
+
+  // Dialog State
+  const [isExpOpen, setIsExpOpen] = useState(false);
+  const [editingExp, setEditingExp] = useState<ExperienceResponse | null>(null);
+  const [expForm, setExpForm] = useState({
+    role: '',
+    firmCompany: '',
+    startDate: '',
+    endDate: '',
+    isCurrent: false,
+    shortBio: '',
+    proofUrl: ''
+  });
+
+  const [isEduOpen, setIsEduOpen] = useState(false);
+  const [editingEdu, setEditingEdu] = useState<EducationResponse | null>(null);
+  const [eduForm, setEduForm] = useState({
+    instituteName: '',
+    degreeName: '',
+    grades: '',
+    degreeImageUrl: ''
+  });
+
+  const fetchProfile = async () => {
+    setIsLoading(true);
+    try {
+      await refreshUser();
+      const [data, specs] = await Promise.all([
+        api.getLawyerMe(),
+        api.getSpecialities()
+      ]);
+
+      setAllSpecialities(specs || []);
+      
+      setProfileData({
+        name: data.fullName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'User',
+        email: data.email || '',
+        phone: data.phoneNumber || data.phoneNo || '',
+        city: data.city || '',
+        bio: data.bio || '',
+        specialization: data.degreeTitle || data.specialization || '',
+        experience: data.yearsOfExperience?.toString() || '0',
+        education: data.university || '',
+        barCouncil: data.barAssociation || '',
+        license: data.barCouncilNumber || data.licenseNumber || '',
+        hourlyRate: data.consultationFee?.toString() || '0',
+        casesWon: data.casesWon?.toString() || '0',
+        activeCases: data.activeCases?.toString() || '0',
+        responseTime: data.responseTime || 'N/A',
+        experiences: data.experiences || [],
+        educations: data.educations || [],
+        specialities: data.specialities || [],
+        profilePhotoUrl: data.profilePhotoUrl || '',
+        rating: Number(data.rating ?? data.Rating) || 0,
+        reviewCount: Number(data.reviewCount ?? data.ReviewCount) || 0,
+        isProfileVisible: data.isProfileVisible ?? data.IsProfileVisible ?? true,
+        isAvailableForNewCases: data.isAvailableForNewCases ?? data.IsAvailableForNewCases ?? true,
+        receiveEmailNotifications: data.receiveEmailNotifications ?? data.ReceiveEmailNotifications ?? true,
+      });
+
+      setSelectedSpecIds((data.specialities || []).map((s: any) => s.id));
+
+      let finalStatus = 0;
+      const vStatus = data.verificationStatus ?? data.status;
+      if (vStatus !== undefined && vStatus !== null) {
+        const vStatusStr = String(vStatus).toLowerCase().trim();
+        if (vStatusStr === 'approved' || vStatusStr === '1') {
+          finalStatus = 1;
+        } else if (vStatusStr === 'rejected' || vStatusStr === '2') {
+          finalStatus = 2;
+        }
+      }
+      setStatus(finalStatus);
+    } catch (err) {
+      console.error('Failed to fetch profile:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      setIsLoading(true);
-      try {
-        await refreshUser();
-        const data = await api.getLawyerMe();
-        setProfileData({
-          name: data.fullName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'User',
-          email: data.email || '',
-          phone: data.phoneNumber || data.phoneNo || '',
-          city: data.city || '',
-          bio: data.bio || '',
-          specialization: data.degreeTitle || data.specialization || '',
-          experience: data.yearsOfExperience?.toString() || '0',
-          education: data.university || '',
-          barCouncil: data.barAssociation || '',
-          license: data.barCouncilNumber || data.licenseNumber || '',
-          hourlyRate: data.consultationFee?.toString() || '0',
-          casesWon: data.casesWon?.toString() || '0',
-          activeCases: data.activeCases?.toString() || '0',
-          responseTime: data.responseTime || 'N/A',
-          experiences: data.experiences || [],
-          educations: data.educations || [],
-          specialities: data.specialities || [],
-          profilePhotoUrl: data.profilePhotoUrl || '',
-          rating: Number(data.rating ?? data.Rating) || 0,
-          reviewCount: Number(data.reviewCount ?? data.ReviewCount) || 0,
-          isProfileVisible: data.isProfileVisible ?? data.IsProfileVisible ?? true,
-          isAvailableForNewCases: data.isAvailableForNewCases ?? data.IsAvailableForNewCases ?? true,
-          receiveEmailNotifications: data.receiveEmailNotifications ?? data.ReceiveEmailNotifications ?? true,
-        });
-        
-        let finalStatus = 0;
-        const vStatus = data.verificationStatus ?? data.status;
-        if (vStatus !== undefined && vStatus !== null) {
-          const vStatusStr = String(vStatus).toLowerCase().trim();
-          if (vStatusStr === 'approved' || vStatusStr === '1') {
-            finalStatus = 1;
-          } else if (vStatusStr === 'rejected' || vStatusStr === '2') {
-            finalStatus = 2;
-          }
-        }
-        setStatus(finalStatus);
-      } catch (err) {
-        console.error('Failed to fetch profile:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchProfile();
   }, []);
 
@@ -150,6 +191,12 @@ const LawyerProfilePage = () => {
     }
   };
 
+  const handleSpecialityToggle = (id: string) => {
+    setSelectedSpecIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
   const handleSave = async () => {
     setIsEditing(false);
     try {
@@ -157,6 +204,7 @@ const LawyerProfilePage = () => {
       const firstName = nameParts[0] || '';
       const lastName = nameParts.slice(1).join(' ') || '';
       
+      // Update core profile fields
       await api.updateLawyerMe({
         firstName,
         lastName,
@@ -169,7 +217,11 @@ const LawyerProfilePage = () => {
         isAvailableForNewCases: profileData.isAvailableForNewCases,
         receiveEmailNotifications: profileData.receiveEmailNotifications
       });
-      await refreshUser();
+
+      // Update specialities interactive list
+      await api.updateSpecialities(selectedSpecIds);
+
+      await fetchProfile();
       toast({
         title: "Success",
         description: "Profile updated successfully.",
@@ -192,7 +244,7 @@ const LawyerProfilePage = () => {
       try {
         const response = await api.uploadLawyerPhoto(formData);
         setProfileData(prev => ({ ...prev, profilePhotoUrl: response.photoUrl }));
-        await refreshUser();
+        await fetchProfile();
         toast({
           title: "Success",
           description: "Profile picture updated successfully.",
@@ -207,6 +259,174 @@ const LawyerProfilePage = () => {
       }
     }
   };
+
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'exp' | 'edu') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const response = await api.uploadProofDocument(formData);
+        if (type === 'exp') {
+          setExpForm(prev => ({ ...prev, proofUrl: response.url }));
+        } else {
+          setEduForm(prev => ({ ...prev, degreeImageUrl: response.url }));
+        }
+        toast({
+          title: "Success",
+          description: "Document uploaded successfully.",
+        });
+      } catch (err) {
+        toast({
+          title: "Error",
+          description: "Failed to upload document. Please try again.",
+          variant: "destructive"
+        });
+      }
+    }
+  };
+
+  // --- EXPERIENCE CRUD ---
+  const openExpDialog = (exp: ExperienceResponse | null = null) => {
+    if (exp) {
+      setEditingExp(exp);
+      setExpForm({
+        role: exp.role || '',
+        firmCompany: exp.firmCompany || '',
+        startDate: exp.startDate ? new Date(exp.startDate).toISOString().split('T')[0] : '',
+        endDate: exp.endDate ? new Date(exp.endDate).toISOString().split('T')[0] : '',
+        isCurrent: exp.isCurrent || false,
+        shortBio: exp.shortBio || '',
+        proofUrl: exp.proofUrl || ''
+      });
+    } else {
+      setEditingExp(null);
+      setExpForm({
+        role: '',
+        firmCompany: '',
+        startDate: '',
+        endDate: '',
+        isCurrent: false,
+        shortBio: '',
+        proofUrl: ''
+      });
+    }
+    setIsExpOpen(true);
+  };
+
+  const saveExperience = async () => {
+    try {
+      if (!expForm.role || !expForm.firmCompany || !expForm.startDate) {
+        toast({ title: "Error", description: "Please fill out all required fields.", variant: "destructive" });
+        return;
+      }
+      const payload = {
+        role: expForm.role,
+        firmCompany: expForm.firmCompany,
+        startDate: expForm.startDate,
+        endDate: expForm.isCurrent ? undefined : (expForm.endDate || undefined),
+        isCurrent: expForm.isCurrent,
+        shortBio: expForm.shortBio,
+        proofUrl: expForm.proofUrl || undefined
+      };
+
+      if (editingExp) {
+        await api.updateExperience(editingExp.id, payload);
+        toast({ title: "Success", description: "Experience updated successfully." });
+      } else {
+        await api.addExperience(payload);
+        toast({ title: "Success", description: "Experience added successfully." });
+      }
+      setIsExpOpen(false);
+      await fetchProfile();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to save experience.", variant: "destructive" });
+    }
+  };
+
+  const deleteExperience = async (id: string) => {
+    if (confirm("Are you sure you want to delete this experience?")) {
+      try {
+        await api.deleteExperience(id);
+        toast({ title: "Success", description: "Experience deleted successfully." });
+        await fetchProfile();
+      } catch (err) {
+        toast({ title: "Error", description: "Failed to delete experience.", variant: "destructive" });
+      }
+    }
+  };
+
+  // --- EDUCATION CRUD ---
+  const openEduDialog = (edu: EducationResponse | null = null) => {
+    if (edu) {
+      setEditingEdu(edu);
+      setEduForm({
+        instituteName: edu.instituteName || '',
+        degreeName: edu.degreeName || '',
+        grades: edu.grades || '',
+        degreeImageUrl: edu.degreeImageUrl || ''
+      });
+    } else {
+      setEditingEdu(null);
+      setEduForm({
+        instituteName: '',
+        degreeName: '',
+        grades: '',
+        degreeImageUrl: ''
+      });
+    }
+    setIsEduOpen(true);
+  };
+
+  const saveEducation = async () => {
+    try {
+      if (!eduForm.instituteName || !eduForm.degreeName) {
+        toast({ title: "Error", description: "Please fill out all required fields.", variant: "destructive" });
+        return;
+      }
+      const payload = {
+        instituteName: eduForm.instituteName,
+        degreeName: eduForm.degreeName,
+        grades: eduForm.grades,
+        degreeImageUrl: eduForm.degreeImageUrl || undefined
+      };
+
+      if (editingEdu) {
+        await api.updateEducation(editingEdu.id, payload);
+        toast({ title: "Success", description: "Education updated successfully." });
+      } else {
+        await api.addEducation(payload);
+        toast({ title: "Success", description: "Education added successfully." });
+      }
+      setIsEduOpen(false);
+      await fetchProfile();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to save education.", variant: "destructive" });
+    }
+  };
+
+  const deleteEducation = async (id: string) => {
+    if (confirm("Are you sure you want to delete this qualification?")) {
+      try {
+        await api.deleteEducation(id);
+        toast({ title: "Success", description: "Education deleted successfully." });
+        await fetchProfile();
+      } catch (err) {
+        toast({ title: "Error", description: "Failed to delete education.", variant: "destructive" });
+      }
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="text-sm font-medium text-muted-foreground animate-pulse">Loading profile dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background py-6 sm:py-8">
@@ -293,13 +513,13 @@ const LawyerProfilePage = () => {
                   )}
                   
                   {status === 1 ? (
-                    <Badge variant="secondary" className="mb-4 bg-emerald-100 text-emerald-800">
+                    <Badge variant="secondary" className="mb-4 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-emerald-200">
                       Verified Lawyer
                     </Badge>
                   ) : status === 2 ? (
                     <Badge variant="destructive" className="mb-4">Rejected</Badge>
                   ) : (
-                    <Badge variant="secondary" className="mb-4 bg-amber-100 text-amber-800">Pending Verification</Badge>
+                    <Badge variant="secondary" className="mb-4 bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200">Pending Verification</Badge>
                   )}
                   
                   <div className="flex items-center justify-center mb-2">
@@ -332,7 +552,7 @@ const LawyerProfilePage = () => {
                         className="text-sm"
                       />
                     ) : (
-                      <span className="text-sm">{profileData.email}</span>
+                      <span className="text-sm truncate">{profileData.email}</span>
                     )}
                   </div>
                   
@@ -345,7 +565,7 @@ const LawyerProfilePage = () => {
                         className="text-sm"
                       />
                     ) : (
-                      <span className="text-sm">{profileData.phone}</span>
+                      <span className="text-sm">{profileData.phone || 'N/A'}</span>
                     )}
                   </div>
                   
@@ -358,7 +578,7 @@ const LawyerProfilePage = () => {
                         className="text-sm"
                       />
                     ) : (
-                      <span className="text-sm">{profileData.city}, Pakistan</span>
+                      <span className="text-sm">{profileData.city ? `${profileData.city}, Pakistan` : 'N/A'}</span>
                     )}
                   </div>
                 </div>
@@ -393,7 +613,7 @@ const LawyerProfilePage = () => {
                       placeholder="Fee"
                     />
                   ) : (
-                    <span className="font-semibold">PKR {profileData.hourlyRate}</span>
+                    <span className="font-semibold text-primary font-bold">PKR {Number(profileData.hourlyRate).toLocaleString()} /hr</span>
                   )}
                 </div>
               </CardContent>
@@ -410,11 +630,12 @@ const LawyerProfilePage = () => {
                 <TabsTrigger value="settings" className="text-xs sm:text-sm py-2">Settings</TabsTrigger>
               </TabsList>
 
+              {/* ABOUT TAB */}
               <TabsContent value="about" className="space-y-6">
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
-                      <User className="w-5 h-5 mr-2" />
+                      <User className="w-5 h-5 mr-2 text-primary" />
                       Professional Bio
                     </CardTitle>
                   </CardHeader>
@@ -423,72 +644,160 @@ const LawyerProfilePage = () => {
                       <Textarea
                         value={profileData.bio}
                         onChange={(e) => handleInputChange('bio', e.target.value)}
-                        rows={4}
-                        placeholder="Tell clients about your experience and expertise..."
+                        rows={6}
+                        placeholder="Tell clients about your experience, legal expertise, accomplishments, and client focus..."
+                        className="text-sm leading-relaxed"
                       />
                     ) : (
-                      <p className="text-muted-foreground leading-relaxed">{profileData.bio}</p>
+                      <p className="text-muted-foreground leading-relaxed text-sm whitespace-pre-wrap">
+                        {profileData.bio || "No professional bio added yet. Write one to attract more clients."}
+                      </p>
                     )}
                   </CardContent>
                 </Card>
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Specializations</CardTitle>
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <Award className="w-5 h-5 mr-2 text-primary" />
+                        <span>Specializations & Practices</span>
+                      </div>
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex flex-wrap gap-2">
-                      {profileData.specialities && profileData.specialities.length > 0 ? (
-                        profileData.specialities.map((spec: any, idx: number) => (
-                          <Badge key={idx} variant="outline">{spec.name || spec}</Badge>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground">No specializations added yet.</p>
-                      )}
-                    </div>
+                    {isEditing ? (
+                      <div className="space-y-4">
+                        <p className="text-xs text-muted-foreground">Select all target specialities that represent your legal practice:</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {allSpecialities.map((spec) => {
+                            const isChecked = selectedSpecIds.includes(spec.id);
+                            return (
+                              <label
+                                key={spec.id}
+                                className={`flex items-center gap-3 p-3 rounded-lg border text-sm cursor-pointer transition-all ${
+                                  isChecked 
+                                    ? "bg-primary/5 border-primary text-primary font-bold shadow-sm" 
+                                    : "bg-background border-border text-muted-foreground hover:bg-muted/50"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => handleSpecialityToggle(spec.id)}
+                                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                />
+                                <span className="truncate">{spec.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {profileData.specialities && profileData.specialities.length > 0 ? (
+                          profileData.specialities.map((spec: any, idx: number) => (
+                            <Badge key={idx} variant="outline" className="px-3 py-1 bg-primary/5 text-primary border-primary/20 hover:bg-primary/10">
+                              {spec.name || spec}
+                            </Badge>
+                          ))
+                        ) : (
+                          <p className="text-sm text-muted-foreground">No specializations selected yet. Edit profile to choose yours!</p>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
 
+              {/* EXPERIENCE TAB */}
               <TabsContent value="experience" className="space-y-6">
                 <Card>
-                  <CardHeader>
+                  <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="flex items-center">
-                      <Award className="w-5 h-5 mr-2" />
+                      <Award className="w-5 h-5 mr-2 text-primary" />
                       Professional Experience
                     </CardTitle>
+                    <Button onClick={() => openExpDialog()} size="sm" className="bg-primary text-white hover:bg-primary/90">
+                      <Plus className="h-4 w-4 mr-1" /> Add Experience
+                    </Button>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {profileData.experiences && profileData.experiences.length > 0 ? (
-                      profileData.experiences.map((exp: any, idx: number) => (
-                        <div key={idx} className="border-l-2 border-primary pl-4">
-                          <h4 className="font-semibold">{exp.role}</h4>
-                          <p className="text-sm text-muted-foreground">{exp.firmCompany}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(exp.startDate).getFullYear()} - {exp.isCurrent ? 'Present' : (exp.endDate ? new Date(exp.endDate).getFullYear() : '')}
-                          </p>
-                          {exp.shortBio && <p className="text-sm mt-2">{exp.shortBio}</p>}
-                        </div>
-                      ))
+                      <div className="relative border-l border-muted pl-4 space-y-6">
+                        {profileData.experiences.map((exp: any) => (
+                          <div key={exp.id} className="relative group">
+                            {/* Marker */}
+                            <div className="absolute -left-[21px] top-1.5 w-3.5 h-3.5 bg-primary rounded-full border-2 border-background" />
+                            
+                            <div className="flex justify-between items-start gap-4">
+                              <div>
+                                <h4 className="font-bold text-foreground">{exp.role}</h4>
+                                <p className="text-sm text-muted-foreground font-medium">{exp.firmCompany}</p>
+                                <p className="text-xs text-primary font-semibold flex items-center gap-1.5 mt-0.5">
+                                  <Calendar className="h-3 w-3" />
+                                  <span>
+                                    {new Date(exp.startDate).toLocaleDateString(undefined, {month: 'short', year: 'numeric'})} - 
+                                    {exp.isCurrent ? ' Present' : (exp.endDate ? ` ${new Date(exp.endDate).toLocaleDateString(undefined, {month: 'short', year: 'numeric'})}` : '')}
+                                  </span>
+                                </p>
+                                
+                                {exp.shortBio && (
+                                  <p className="text-sm text-muted-foreground/90 mt-2 bg-muted/20 p-2 rounded-lg leading-relaxed whitespace-pre-wrap">
+                                    {exp.shortBio}
+                                  </p>
+                                )}
+
+                                {exp.proofUrl && (
+                                  <a 
+                                    href={exp.proofUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 text-xs text-primary font-bold mt-2 hover:underline"
+                                  >
+                                    <FileText className="h-3.5 w-3.5" />
+                                    <span>View Employment Proof Document</span>
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button onClick={() => openExpDialog(exp)} size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                  <Edit3 className="h-4 w-4" />
+                                </Button>
+                                <Button onClick={() => deleteExperience(exp.id)} size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:bg-destructive/10">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">No experience details added yet.</p>
+                      <div className="text-center py-10 bg-muted/10 rounded-xl border border-dashed">
+                        <Award className="h-10 w-10 text-muted-foreground/40 mx-auto mb-2" />
+                        <h4 className="font-semibold text-sm">No experience added yet</h4>
+                        <p className="text-xs text-muted-foreground max-w-xs mx-auto mt-1">Add your past roles, law firms, and legal positions to build trust with clients.</p>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
               </TabsContent>
 
+              {/* EDUCATION TAB */}
               <TabsContent value="education" className="space-y-6">
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
-                      <BookOpen className="w-5 h-5 mr-2" />
+                      <BookOpen className="w-5 h-5 mr-2 text-primary" />
                       Education & Credentials
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="education">Education</Label>
+                        <Label htmlFor="education">University / Institute</Label>
                         {isEditing ? (
                           <Input
                             id="education"
@@ -496,12 +805,12 @@ const LawyerProfilePage = () => {
                             onChange={(e) => handleInputChange('education', e.target.value)}
                           />
                         ) : (
-                          <p className="text-sm text-muted-foreground mt-1">{profileData.education}</p>
+                          <p className="text-sm text-muted-foreground mt-1">{profileData.education || 'N/A'}</p>
                         )}
                       </div>
                       
                       <div>
-                        <Label htmlFor="barCouncil">Bar Council</Label>
+                        <Label htmlFor="barCouncil">Bar Association</Label>
                         {isEditing ? (
                           <Input
                             id="barCouncil"
@@ -509,7 +818,7 @@ const LawyerProfilePage = () => {
                             onChange={(e) => handleInputChange('barCouncil', e.target.value)}
                           />
                         ) : (
-                          <p className="text-sm text-muted-foreground mt-1">{profileData.barCouncil}</p>
+                          <p className="text-sm text-muted-foreground mt-1">{profileData.barCouncil || 'N/A'}</p>
                         )}
                       </div>
                       
@@ -522,7 +831,7 @@ const LawyerProfilePage = () => {
                             onChange={(e) => handleInputChange('license', e.target.value)}
                           />
                         ) : (
-                          <p className="text-sm text-muted-foreground mt-1">{profileData.license}</p>
+                          <p className="text-sm text-muted-foreground mt-1">{profileData.license || 'N/A'}</p>
                         )}
                       </div>
                       
@@ -535,14 +844,75 @@ const LawyerProfilePage = () => {
                             onChange={(e) => handleInputChange('experience', e.target.value)}
                           />
                         ) : (
-                          <p className="text-sm text-muted-foreground mt-1">{profileData.experience}</p>
+                          <p className="text-sm text-muted-foreground mt-1">{profileData.experience} Years</p>
                         )}
                       </div>
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* DEGREES LIST */}
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle className="flex items-center text-base">
+                      <GraduationCap className="w-5 h-5 mr-2 text-primary" />
+                      Degrees & Certifications
+                    </CardTitle>
+                    <Button onClick={() => openEduDialog()} size="sm" className="bg-primary text-white hover:bg-primary/90">
+                      <Plus className="h-4 w-4 mr-1" /> Add Qualification
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {profileData.educations && profileData.educations.length > 0 ? (
+                      <div className="grid md:grid-cols-2 gap-4">
+                        {profileData.educations.map((edu: any) => (
+                          <div key={edu.id} className="p-4 rounded-xl border bg-card relative group hover:shadow-md transition-all">
+                            <div className="flex justify-between items-start gap-4">
+                              <div>
+                                <h4 className="font-bold text-foreground text-sm">{edu.degreeName}</h4>
+                                <p className="text-xs text-muted-foreground font-semibold">{edu.instituteName}</p>
+                                <p className="text-xs text-primary font-bold mt-1 bg-primary/5 px-2 py-0.5 rounded-full inline-block">
+                                  Grade/Score: {edu.grades || 'N/A'}
+                                </p>
+
+                                {edu.degreeImageUrl && (
+                                  <a 
+                                    href={edu.degreeImageUrl} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-[11px] text-primary font-bold mt-3 hover:underline"
+                                  >
+                                    <FileText className="h-3.5 w-3.5" />
+                                    <span>View Degree Certificate</span>
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2">
+                                <Button onClick={() => openEduDialog(edu)} size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground">
+                                  <Edit3 className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button onClick={() => deleteEducation(edu.id)} size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:bg-destructive/10">
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 bg-muted/10 rounded-xl border border-dashed">
+                        <GraduationCap className="h-10 w-10 text-muted-foreground/40 mx-auto mb-2" />
+                        <h4 className="font-semibold text-sm">No degrees uploaded yet</h4>
+                        <p className="text-xs text-muted-foreground max-w-xs mx-auto mt-1">Upload verified copies of your certifications to raise your verification score.</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
 
+              {/* SETTINGS TAB */}
               <TabsContent value="settings" className="space-y-6">
                 <Card>
                   <CardHeader>
@@ -588,6 +958,164 @@ const LawyerProfilePage = () => {
           </div>
         </div>
       </div>
+
+      {/* --- EXPERIENCE DIALOG --- */}
+      <Dialog open={isExpOpen} onOpenChange={setIsExpOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingExp ? 'Edit Experience' : 'Add Experience'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1">
+              <Label className="after:content-['*'] after:ml-0.5 after:text-red-500">Role / Job Title</Label>
+              <Input
+                placeholder="e.g. Senior Partner, Corporate Associate"
+                value={expForm.role}
+                onChange={(e) => setExpForm(prev => ({ ...prev, role: e.target.value }))}
+              />
+            </div>
+            
+            <div className="space-y-1">
+              <Label className="after:content-['*'] after:ml-0.5 after:text-red-500">Law Firm / Corporate Employer</Label>
+              <Input
+                placeholder="e.g. Malik & Malik Associates"
+                value={expForm.firmCompany}
+                onChange={(e) => setExpForm(prev => ({ ...prev, firmCompany: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="after:content-['*'] after:ml-0.5 after:text-red-500">Start Date</Label>
+                <Input
+                  type="date"
+                  value={expForm.startDate}
+                  onChange={(e) => setExpForm(prev => ({ ...prev, startDate: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>End Date</Label>
+                <Input
+                  type="date"
+                  disabled={expForm.isCurrent}
+                  value={expForm.isCurrent ? '' : expForm.endDate}
+                  onChange={(e) => setExpForm(prev => ({ ...prev, endDate: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="isCurrent"
+                checked={expForm.isCurrent}
+                onChange={(e) => setExpForm(prev => ({ ...prev, isCurrent: e.target.checked }))}
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <Label htmlFor="isCurrent" className="cursor-pointer">Currently employed here</Label>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Description / Responsibilities</Label>
+              <Textarea
+                placeholder="Describe your legal focus, primary client work, key achievements..."
+                value={expForm.shortBio}
+                onChange={(e) => setExpForm(prev => ({ ...prev, shortBio: e.target.value }))}
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Employment Proof (Verification Document)</Label>
+              {expForm.proofUrl ? (
+                <div className="flex items-center justify-between p-2.5 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-100 text-xs">
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    <CheckCircle className="h-4 w-4 text-emerald-500" />
+                    <span>File uploaded successfully!</span>
+                  </span>
+                  <a href={expForm.proofUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
+                    View <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              ) : (
+                <Input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => handleDocumentUpload(e, 'exp')}
+                  className="text-xs"
+                />
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsExpOpen(false)}>Cancel</Button>
+            <Button onClick={saveExperience}>Save Experience</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- EDUCATION DIALOG --- */}
+      <Dialog open={isEduOpen} onOpenChange={setIsEduOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingEdu ? 'Edit Qualification' : 'Add Qualification'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1">
+              <Label className="after:content-['*'] after:ml-0.5 after:text-red-500">Degree / Certification Title</Label>
+              <Input
+                placeholder="e.g. LL.M, LL.B (Hons), Bar Professional Training Course"
+                value={eduForm.degreeName}
+                onChange={(e) => setEduForm(prev => ({ ...prev, degreeName: e.target.value }))}
+              />
+            </div>
+            
+            <div className="space-y-1">
+              <Label className="after:content-['*'] after:ml-0.5 after:text-red-500">University / Institution Name</Label>
+              <Input
+                placeholder="e.g. Quaid-i-Azam University, University of London"
+                value={eduForm.instituteName}
+                onChange={(e) => setEduForm(prev => ({ ...prev, instituteName: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Grade / Score / Division</Label>
+              <Input
+                placeholder="e.g. 3.8 CGPA, First Class, Grade A"
+                value={eduForm.grades}
+                onChange={(e) => setEduForm(prev => ({ ...prev, grades: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Certificate / Degree Proof (Verification Image)</Label>
+              {eduForm.degreeImageUrl ? (
+                <div className="flex items-center justify-between p-2.5 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-600 dark:text-emerald-400 rounded-lg border border-emerald-100 text-xs">
+                  <span className="flex items-center gap-1.5 font-semibold">
+                    <CheckCircle className="h-4 w-4 text-emerald-500" />
+                    <span>Certificate uploaded!</span>
+                  </span>
+                  <a href={eduForm.degreeImageUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
+                    View <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              ) : (
+                <Input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => handleDocumentUpload(e, 'edu')}
+                  className="text-xs"
+                />
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEduOpen(false)}>Cancel</Button>
+            <Button onClick={saveEducation}>Save Qualification</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

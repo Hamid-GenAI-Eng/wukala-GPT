@@ -24,6 +24,7 @@ const clientNav = [
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Docs', href: '/documents', icon: FileText },
   { name: 'Lawyers', href: '/lawyers', icon: Users },
+  { name: 'Profile', href: '/client-profile', icon: User },
 ];
 
 const lawyerNav = [

@@ -249,22 +249,35 @@ export default function LawyersPage() {
                         {lawyer.isVerified && <Award className="h-5 w-5 text-gold fill-gold/10" />}
                       </div>
 
+                      {lawyer.degreeTitle && (
+                        <p className="text-xs font-semibold text-primary/90 flex items-center gap-1 mb-2">
+                          <GraduationCap className="h-3.5 w-3.5" />
+                          <span>{lawyer.degreeTitle} {lawyer.university && `from ${lawyer.university}`}</span>
+                        </p>
+                      )}
+
                       <div className="flex items-center gap-1 text-sm mb-3">
                         <Star className="h-4 w-4 text-warning fill-warning" />
                         <span className="font-bold">{lawyer.rating || 'N/A'}</span>
                         <span className="text-muted-foreground">({lawyer.reviewCount || 0} reviews)</span>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3 mb-4 text-xs md:text-sm text-muted-foreground">
+                      <div className="grid grid-cols-2 gap-3 mb-2 text-xs md:text-sm text-muted-foreground">
                         <div className="flex items-center gap-1.5">
                           <MapPin className="h-3.5 w-3.5 text-primary" />
                           <span className="truncate">{lawyer.city}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <GraduationCap className="h-3.5 w-3.5 text-primary" />
+                          <Clock className="h-3.5 w-3.5 text-primary" />
                           <span>{lawyer.experienceYears || 0} Years Exp.</span>
                         </div>
                       </div>
+
+                      {lawyer.bio && (
+                        <p className="text-xs text-muted-foreground line-clamp-2 my-3 bg-muted/30 p-2.5 rounded-lg border border-border/30 italic">
+                          "{lawyer.bio}"
+                        </p>
+                      )}
 
                       <div className="flex flex-wrap gap-1.5 mb-4">
                         {lawyer.specialities.slice(0, 3).map((spec) => (

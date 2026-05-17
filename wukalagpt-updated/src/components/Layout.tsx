@@ -83,7 +83,6 @@ const lawyerNavigation = [
   { name: 'AI Assistant', href: '/chat', icon: MessageSquare },
   { name: 'Messages', href: '/messages', icon: MessageSquare },
   { name: 'Documents', href: '/documents', icon: FileText },
-  { name: 'Find Lawyers', href: '/lawyers', icon: Users },
 ];
 
 const adminNavigation = [
@@ -503,6 +502,14 @@ export default function Layout({ children }: LayoutProps) {
                     {(user?.role || '').toLowerCase() === 'lawyer' && (
                       <DropdownMenuItem asChild>
                         <Link to="/lawyer-profile" className="cursor-pointer">
+                          <User className="mr-2 h-4 w-4" />
+                          My Profile
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
+                    {(user?.role || '').toLowerCase() === 'client' && (
+                      <DropdownMenuItem asChild>
+                        <Link to="/client-profile" className="cursor-pointer">
                           <User className="mr-2 h-4 w-4" />
                           My Profile
                         </Link>

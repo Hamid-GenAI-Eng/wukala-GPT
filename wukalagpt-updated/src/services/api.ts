@@ -288,6 +288,16 @@ export const api = {
   },
 
   /**
+   * Upload proof document/image
+   */
+  uploadProofDocument: async (formData: FormData) => {
+    return request<{ url: string }>('/Lawyers/me/document', {
+      method: 'POST',
+      body: formData,
+    }, true);
+  },
+
+  /**
    * Get lawyer dashboard overview statistics and items
    */
   getLawyerDashboardOverview: async () => {
@@ -600,7 +610,7 @@ export const api = {
    * Get all saved lawyer profiles for the current user
    */
   getSavedProfiles: async () => {
-    return request<PublicLawyerProfile[]>('/SavedProfile', {
+    return request<PublicLawyerProfile[]>('/SavedProfiles', {
       method: 'GET',
     }, true);
   },
@@ -609,9 +619,8 @@ export const api = {
    * Toggle a lawyer profile as saved
    */
   saveProfile: async (lawyerId: string) => {
-    return request<{ message: string }>('/SavedProfile', {
+    return request<{ message: string }>(`/SavedProfiles/${lawyerId}/toggle`, {
       method: 'POST',
-      body: JSON.stringify({ lawyerId }),
     }, true);
   },
 
@@ -1161,6 +1170,14 @@ export const api = {
       params,
     }, true);
   },
+
+  // ==================== CLIENT PROFILE ENDPOINTS ====================
+  updateClientProfile: async (id: string, data: any) => {
+    return request<any>(`/Clients/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, true);
+  },
 };
 
 
@@ -1197,13 +1214,13 @@ export enum DocumentClassification {
 }
 
 export interface ExperienceRequest {
-  title: string;
-  company: string;
-  location: string;
+  role: string;
+  firmCompany: string;
   startDate: string;
   endDate?: string;
   isCurrent: boolean;
-  description: string;
+  shortBio?: string;
+  proofUrl?: string;
 }
 
 export interface ExperienceResponse extends ExperienceRequest {
@@ -1211,13 +1228,10 @@ export interface ExperienceResponse extends ExperienceRequest {
 }
 
 export interface EducationRequest {
-  degree: string;
-  institution: string;
-  fieldOfStudy: string;
-  startDate: string;
-  endDate?: string;
-  grade: string;
-  description: string;
+  instituteName: string;
+  degreeName: string;
+  grades: string;
+  degreeImageUrl?: string;
 }
 
 export interface EducationResponse extends EducationRequest {

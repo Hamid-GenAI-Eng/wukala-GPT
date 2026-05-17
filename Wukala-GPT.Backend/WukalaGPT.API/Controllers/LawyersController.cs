@@ -12,10 +12,12 @@ namespace WukalaGPT.API.Controllers;
 public class LawyersController : ControllerBase
 {
     private readonly ILawyerProfileService _profileService;
+    private readonly IFileStorageService _fileStorage;
 
-    public LawyersController(ILawyerProfileService profileService)
+    public LawyersController(ILawyerProfileService profileService, IFileStorageService fileStorage)
     {
         _profileService = profileService;
+        _fileStorage = fileStorage;
     }
 
     private Guid GetUserId()
@@ -61,6 +63,23 @@ public class LawyersController : ControllerBase
         {
             var url = await _profileService.UpdateProfilePhotoAsync(GetUserId(), photo);
             return Ok(new { photoUrl = url, message = "Photo updated successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("me/document")]
+    public async Task<IActionResult> UploadDocument(IFormFile file)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "No file uploaded." });
+
+            var url = await _fileStorage.UploadFileAsync(file, "lawyer-proofs");
+            return Ok(new { url, message = "Document uploaded successfully." });
         }
         catch (Exception ex)
         {

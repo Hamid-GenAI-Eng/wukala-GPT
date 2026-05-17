@@ -160,7 +160,11 @@ public class LawyerSearchService : ILawyerSearchService
                 YearsOfExperience = p.Lawyer.YearsOfExperience,
                 Badges = p.Lawyer.Badges,
                 Specialities = p.Lawyer.LawyerSpecialities.Select(ls => ls.Speciality.Name).ToList(),
-                RelevanceScore = finalScore
+                RelevanceScore = finalScore,
+                Bio = p.Lawyer.Bio,
+                DegreeTitle = p.Lawyer.DegreeTitle,
+                University = p.Lawyer.University,
+                Specialization = p.Lawyer.Specialization
             };
         }).ToList();
 
@@ -247,7 +251,8 @@ public class LawyerSearchService : ILawyerSearchService
                 StartDate = e.StartDate,
                 EndDate = e.EndDate,
                 IsCurrent = e.IsCurrent,
-                ShortBio = e.ShortBio
+                ShortBio = e.ShortBio,
+                ProofUrl = e.ProofUrl
             }).ToList(),
             
             Educations = lawyer.Educations.Select(e => new EducationDto
