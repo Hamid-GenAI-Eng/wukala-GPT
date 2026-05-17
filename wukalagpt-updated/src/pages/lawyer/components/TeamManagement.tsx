@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,8 +29,11 @@ import {
   X,
   Send,
   ChevronRight,
+  Loader2,
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import api from '@/services/api';
 import {
   Dialog,
   DialogContent,
@@ -164,7 +166,88 @@ export default function TeamManagement() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [taskFilter, setTaskFilter] = useState<string>('all');
 
-  const filteredTasks = taskFilter === 'all' ? tasks : tasks.filter(t => t.status === taskFilter);
+  // New Invite Form State
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'Junior Lawyer' | 'Clerk'>('Junior Lawyer');
+  const [inviting, setInviting] = useState(false);
+
+  // Dynamic States
+  const [loading, setLoading] = useState(true);
+  const [members, setMembers] = useState<any[]>([]);
+  const [allTasks, setAllTasks] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadTeamData() {
+      try {
+        setLoading(true);
+        const [membersRes, tasksRes, activitiesRes] = await Promise.allSettled([
+          api.getTeamMembers(),
+          api.getTeamTasks(),
+          api.getTeamActivity()
+        ]);
+
+        if (membersRes.status === 'fulfilled' && membersRes.value && membersRes.value.length > 0) {
+          setMembers(membersRes.value);
+        } else {
+          setMembers(teamMembers);
+        }
+
+        if (tasksRes.status === 'fulfilled' && tasksRes.value && tasksRes.value.length > 0) {
+          setAllTasks(tasksRes.value);
+        } else {
+          setAllTasks(tasks);
+        }
+
+        if (activitiesRes.status === 'fulfilled' && activitiesRes.value && activitiesRes.value.length > 0) {
+          setActivities(activitiesRes.value);
+        } else {
+          setActivities(activityLogs);
+        }
+      } catch (err) {
+        console.error("Failed to fetch team details from backend. Reverting to elegant mockups", err);
+        setMembers(teamMembers);
+        setAllTasks(tasks);
+        setActivities(activityLogs);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadTeamData();
+  }, []);
+
+  const handleInvite = async () => {
+    if (!inviteEmail) return;
+    try {
+      setInviting(true);
+      const roleEnum = inviteRole === 'Junior Lawyer' ? 1 : 2; // 1 = Junior Lawyer, 2 = Clerk
+      await api.inviteTeamMember({ email: inviteEmail, role: roleEnum });
+      setInviteOpen(false);
+      setInviteEmail('');
+      // Refresh list
+      const updatedMembers = await api.getTeamMembers();
+      if (updatedMembers && updatedMembers.length > 0) {
+        setMembers(updatedMembers);
+      }
+    } catch (err) {
+      console.error("Failed to send invitation", err);
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const filteredTasks = taskFilter === 'all' 
+    ? allTasks 
+    : allTasks.filter(t => t.status === taskFilter);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground font-sans">Connecting to secure firm directory...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -172,7 +255,7 @@ export default function TeamManagement() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold font-sans text-foreground">Team & Staff Management</h2>
-          <p className="text-xs text-muted-foreground font-sans mt-0.5">{teamMembers.length} members · Role-based access control</p>
+          <p className="text-xs text-muted-foreground font-sans mt-0.5">{members.length} members · Role-based access control</p>
         </div>
         <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
           <DialogTrigger asChild>
@@ -187,7 +270,7 @@ export default function TeamManagement() {
             <div className="space-y-4 mt-2">
               <div>
                 <label className="text-xs font-sans text-muted-foreground">Email Address</label>
-                <Input placeholder="colleague@lawfirm.pk" className="mt-1 text-sm font-sans" />
+                <Input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="colleague@lawfirm.pk" className="mt-1 text-sm font-sans" />
               </div>
               <div>
                 <label className="text-xs font-sans text-muted-foreground mb-2 block">Assign Role</label>
@@ -196,15 +279,17 @@ export default function TeamManagement() {
                     { role: 'Junior Lawyer', desc: 'Can view and update cases, hearings, documents. Cannot access billing.' },
                     { role: 'Clerk', desc: 'Can view hearing schedules and basic case data only. Read-only access.' },
                   ].map(r => (
-                    <div key={r.role} className="p-3 rounded-lg border border-border/50 hover:bg-secondary/30 transition-colors cursor-pointer">
+                    <div key={r.role} className={`p-3 rounded-lg border transition-colors cursor-pointer ${
+                      inviteRole === r.role ? 'border-primary bg-primary/5' : 'border-border/50 hover:bg-secondary/30'
+                    }`} onClick={() => setInviteRole(r.role as any)}>
                       <p className="text-sm font-semibold font-sans text-foreground">{r.role}</p>
                       <p className="text-[10px] text-muted-foreground font-sans mt-0.5">{r.desc}</p>
                     </div>
                   ))}
                 </div>
               </div>
-              <Button className="w-full bg-gradient-primary font-sans text-sm gap-2">
-                <Send className="h-4 w-4" /> Send Invitation
+              <Button onClick={handleInvite} disabled={inviting || !inviteEmail} className="w-full bg-gradient-primary font-sans text-sm gap-2">
+                {inviting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send Invitation
               </Button>
             </div>
           </DialogContent>
@@ -214,10 +299,10 @@ export default function TeamManagement() {
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Administrators', value: teamMembers.filter(m => m.role === 'Administrator').length, icon: ShieldCheck, color: 'text-primary' },
-          { label: 'Junior Lawyers', value: teamMembers.filter(m => m.role === 'Junior Lawyer').length, icon: Shield, color: 'text-gold' },
-          { label: 'Clerks', value: teamMembers.filter(m => m.role === 'Clerk').length, icon: ShieldAlert, color: 'text-muted-foreground' },
-          { label: 'Pending Tasks', value: tasks.filter(t => t.status !== 'Completed').length, icon: Clock, color: 'text-destructive' },
+          { label: 'Administrators', value: members.filter(m => m.role === 'Administrator').length, icon: ShieldCheck, color: 'text-primary' },
+          { label: 'Junior Lawyers', value: members.filter(m => m.role === 'Junior Lawyer').length, icon: Shield, color: 'text-gold' },
+          { label: 'Clerks', value: members.filter(m => m.role === 'Clerk').length, icon: ShieldAlert, color: 'text-muted-foreground' },
+          { label: 'Pending Tasks', value: allTasks.filter(t => t.status !== 'Completed').length, icon: Clock, color: 'text-destructive' },
         ].map(s => (
           <Card key={s.label} className="border-border/50 shadow-sm">
             <CardContent className="p-4">
@@ -246,7 +331,7 @@ export default function TeamManagement() {
         {/* ═══ TEAM MEMBERS ═══ */}
         {activeTab === 'members' && (
           <motion.div key="members" {...fadeIn} className="space-y-3">
-            {teamMembers.map(member => {
+            {members.map(member => {
               const RoleIcon = roleIcon[member.role];
               return (
                 <Card key={member.id} className="border-border/50 shadow-sm hover:shadow-md transition-all duration-200">
@@ -356,7 +441,7 @@ export default function TeamManagement() {
               <CardContent className="p-4">
                 <h3 className="text-sm font-semibold font-sans text-foreground mb-3">Recent Activity — All Team Members</h3>
                 <div className="space-y-0">
-                  {activityLogs.map((log, i) => {
+                  {activities.map((log, i) => {
                     const Icon = activityIcon[log.type];
                     return (
                       <div key={log.id} className="flex items-start gap-3 py-3 border-b border-border/30 last:border-0">

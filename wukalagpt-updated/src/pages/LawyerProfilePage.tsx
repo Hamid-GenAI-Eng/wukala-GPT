@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
 import { 
   User, 
   Mail, 
@@ -20,9 +21,12 @@ import {
   Camera
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import api from '@/services/api';
+import { useToast } from "@/hooks/use-toast";
 
 const LawyerProfilePage = () => {
   const { user, refreshUser } = useAuth();
+  const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({
     name: user?.fullName || 'User',
@@ -42,7 +46,12 @@ const LawyerProfilePage = () => {
     experiences: [] as any[],
     educations: [] as any[],
     specialities: [] as any[],
-    profilePhotoUrl: ''
+    profilePhotoUrl: '',
+    rating: 0,
+    reviewCount: 0,
+    isProfileVisible: true,
+    isAvailableForNewCases: true,
+    receiveEmailNotifications: true,
   });
 
   const [status, setStatus] = useState<number>(0);
@@ -72,15 +81,23 @@ const LawyerProfilePage = () => {
           experiences: data.experiences || [],
           educations: data.educations || [],
           specialities: data.specialities || [],
-          profilePhotoUrl: data.profilePhotoUrl || ''
+          profilePhotoUrl: data.profilePhotoUrl || '',
+          rating: Number(data.rating ?? data.Rating) || 0,
+          reviewCount: Number(data.reviewCount ?? data.ReviewCount) || 0,
+          isProfileVisible: data.isProfileVisible ?? data.IsProfileVisible ?? true,
+          isAvailableForNewCases: data.isAvailableForNewCases ?? data.IsAvailableForNewCases ?? true,
+          receiveEmailNotifications: data.receiveEmailNotifications ?? data.ReceiveEmailNotifications ?? true,
         });
+        
         let finalStatus = 0;
         const vStatus = data.verificationStatus ?? data.status;
-        if (typeof vStatus === 'string') {
-          if (vStatus.toLowerCase() === 'approved') finalStatus = 1;
-          else if (vStatus.toLowerCase() === 'rejected') finalStatus = 2;
-        } else {
-          finalStatus = Number(vStatus) || 0;
+        if (vStatus !== undefined && vStatus !== null) {
+          const vStatusStr = String(vStatus).toLowerCase().trim();
+          if (vStatusStr === 'approved' || vStatusStr === '1') {
+            finalStatus = 1;
+          } else if (vStatusStr === 'rejected' || vStatusStr === '2') {
+            finalStatus = 2;
+          }
         }
         setStatus(finalStatus);
       } catch (err) {
@@ -94,6 +111,43 @@ const LawyerProfilePage = () => {
 
   const handleInputChange = (field: string, value: string) => {
     setProfileData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleToggleSetting = async (key: 'isProfileVisible' | 'isAvailableForNewCases' | 'receiveEmailNotifications', currentValue: boolean) => {
+    const newValue = !currentValue;
+    setProfileData(prev => ({ ...prev, [key]: newValue }));
+    
+    try {
+      const nameParts = profileData.name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+      
+      await api.updateLawyerMe({
+        firstName,
+        lastName,
+        phoneNumber: profileData.phone,
+        city: profileData.city,
+        bio: profileData.bio,
+        consultationFee: parseFloat(profileData.hourlyRate) || 0,
+        yearsOfExperience: parseInt(profileData.experience) || 0,
+        isProfileVisible: key === 'isProfileVisible' ? newValue : profileData.isProfileVisible,
+        isAvailableForNewCases: key === 'isAvailableForNewCases' ? newValue : profileData.isAvailableForNewCases,
+        receiveEmailNotifications: key === 'receiveEmailNotifications' ? newValue : profileData.receiveEmailNotifications
+      });
+      
+      toast({
+        title: "Setting Updated",
+        description: `Successfully updated setting.`,
+      });
+    } catch (err) {
+      console.error('Failed to update setting:', err);
+      setProfileData(prev => ({ ...prev, [key]: currentValue }));
+      toast({
+        title: "Error",
+        description: "Failed to update setting. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleSave = async () => {
@@ -110,10 +164,23 @@ const LawyerProfilePage = () => {
         city: profileData.city,
         bio: profileData.bio,
         consultationFee: parseFloat(profileData.hourlyRate) || 0,
-        yearsOfExperience: parseInt(profileData.experience) || 0
+        yearsOfExperience: parseInt(profileData.experience) || 0,
+        isProfileVisible: profileData.isProfileVisible,
+        isAvailableForNewCases: profileData.isAvailableForNewCases,
+        receiveEmailNotifications: profileData.receiveEmailNotifications
+      });
+      await refreshUser();
+      toast({
+        title: "Success",
+        description: "Profile updated successfully.",
       });
     } catch (err) {
       console.error('Update failed:', err);
+      toast({
+        title: "Error",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -125,8 +192,18 @@ const LawyerProfilePage = () => {
       try {
         const response = await api.uploadLawyerPhoto(formData);
         setProfileData(prev => ({ ...prev, profilePhotoUrl: response.photoUrl }));
+        await refreshUser();
+        toast({
+          title: "Success",
+          description: "Profile picture updated successfully.",
+        });
       } catch (err) {
         console.error('Failed to upload photo:', err);
+        toast({
+          title: "Error",
+          description: "Failed to upload profile picture. Please try again.",
+          variant: "destructive"
+        });
       }
     }
   };
@@ -228,9 +305,18 @@ const LawyerProfilePage = () => {
                   <div className="flex items-center justify-center mb-2">
                     <div className="flex items-center">
                       {[1, 2, 3, 4, 5].map((star) => (
-                        <Star key={star} className="w-4 h-4 fill-gold text-gold" />
+                        <Star
+                          key={star}
+                          className={`w-4 h-4 ${
+                            star <= Math.round(profileData.rating)
+                              ? 'fill-gold text-gold'
+                              : 'text-muted-foreground/30'
+                          }`}
+                        />
                       ))}
-                      <span className="ml-2 text-sm text-muted-foreground">4.9 (127 reviews)</span>
+                      <span className="ml-2 text-sm text-muted-foreground">
+                        {profileData.rating > 0 ? profileData.rating.toFixed(1) : 'No ratings'} ({profileData.reviewCount} {profileData.reviewCount === 1 ? 'review' : 'reviews'})
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -462,29 +548,38 @@ const LawyerProfilePage = () => {
                   <CardHeader>
                     <CardTitle>Profile Settings</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <div>
+                      <div className="space-y-0.5">
                         <Label>Profile Visibility</Label>
-                        <p className="text-sm text-muted-foreground">Make your profile visible to potential clients</p>
+                        <p className="text-sm text-muted-foreground">Make your profile visible to potential clients on the marketplace</p>
                       </div>
-                      <Button variant="outline" size="sm">Public</Button>
+                      <Switch
+                        checked={profileData.isProfileVisible}
+                        onCheckedChange={() => handleToggleSetting('isProfileVisible', profileData.isProfileVisible)}
+                      />
                     </div>
                     
-                    <div className="flex items-center justify-between">
-                      <div>
+                    <div className="flex items-center justify-between border-t border-border/50 pt-4">
+                      <div className="space-y-0.5">
                         <Label>Available for New Cases</Label>
-                        <p className="text-sm text-muted-foreground">Accept new case inquiries</p>
+                        <p className="text-sm text-muted-foreground">Indicate if you are currently accepting new case inquiries</p>
                       </div>
-                      <Button variant="outline" size="sm">Available</Button>
+                      <Switch
+                        checked={profileData.isAvailableForNewCases}
+                        onCheckedChange={() => handleToggleSetting('isAvailableForNewCases', profileData.isAvailableForNewCases)}
+                      />
                     </div>
                     
-                    <div className="flex items-center justify-between">
-                      <div>
+                    <div className="flex items-center justify-between border-t border-border/50 pt-4">
+                      <div className="space-y-0.5">
                         <Label>Email Notifications</Label>
-                        <p className="text-sm text-muted-foreground">Receive email updates for new inquiries</p>
+                        <p className="text-sm text-muted-foreground">Receive instant email updates for new messages and case updates</p>
                       </div>
-                      <Button variant="outline" size="sm">Enabled</Button>
+                      <Switch
+                        checked={profileData.receiveEmailNotifications}
+                        onCheckedChange={() => handleToggleSetting('receiveEmailNotifications', profileData.receiveEmailNotifications)}
+                      />
                     </div>
                   </CardContent>
                 </Card>

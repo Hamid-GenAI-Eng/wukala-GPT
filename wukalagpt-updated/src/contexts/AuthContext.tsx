@@ -53,7 +53,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     console.log('AuthContext: Loading persisted auth...');
     
     // --- TEMPORARY MOCK AUTH FOR TESTING ---
-    const MOCK_MODE = true; 
+    const MOCK_MODE = false; 
     const mockLawyer: User = {
       id: 'mock-lawyer-id',
       name: 'Ahmed Khan',

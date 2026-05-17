@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -56,7 +55,10 @@ import {
   StickyNote,
   Paperclip,
   GitBranch,
+  Loader2,
 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import api from '@/services/api';
 
 // ─── Data Types ─────────────────────────────────────────────────────
 interface CaseFile {
@@ -356,7 +358,81 @@ export default function CaseManagement() {
   const [filterType, setFilterType] = useState('All Types');
   const [newNote, setNewNote] = useState('');
 
-  const filteredCases = cases.filter(c => {
+  // Dynamic States
+  const [loading, setLoading] = useState(true);
+  const [caseList, setCaseList] = useState<CaseFile[]>([]);
+  const [addingCase, setAddingCase] = useState(false);
+  
+  const [newCaseData, setNewCaseData] = useState({
+    title: '',
+    caseNumber: '',
+    firNumber: '',
+    client: '',
+    court: '',
+    judge: '',
+    opposingCounsel: '',
+    type: '',
+    priority: 'Medium',
+    status: 'Active' as CaseStatus,
+    stage: '',
+    nextHearing: '',
+    filedDate: new Date().toISOString().split('T')[0],
+    description: ''
+  });
+
+  useEffect(() => {
+    async function loadCases() {
+      try {
+        setLoading(true);
+        const res = await api.getCases();
+        if (res && res.length > 0) {
+          setCaseList(res);
+        } else {
+          setCaseList(cases);
+        }
+      } catch (err) {
+        console.error("Failed to load secure cases directory. Falling back to offline client view", err);
+        setCaseList(cases);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadCases();
+  }, []);
+
+  const handleAddCase = async () => {
+    try {
+      setAddingCase(true);
+      await api.createCase(newCaseData);
+      setShowNewCase(false);
+      setNewCaseData({
+        title: '',
+        caseNumber: '',
+        firNumber: '',
+        client: '',
+        court: '',
+        judge: '',
+        opposingCounsel: '',
+        type: '',
+        priority: 'Medium',
+        status: 'Active',
+        stage: '',
+        nextHearing: '',
+        filedDate: new Date().toISOString().split('T')[0],
+        description: ''
+      });
+      const updated = await api.getCases();
+      if (updated && updated.length > 0) {
+        setCaseList(updated);
+      }
+    } catch (err) {
+      console.error("Failed to create case", err);
+    } finally {
+      setAddingCase(false);
+    }
+  };
+
+  const filteredCases = caseList.filter(c => {
     const matchSearch =
       c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -367,6 +443,15 @@ export default function CaseManagement() {
     const matchType = filterType === 'All Types' || c.type === filterType;
     return matchSearch && matchTab && matchCourt && matchType;
   });
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground font-sans">Connecting to secure cases vault...</p>
+      </div>
+    );
+  }
 
   // ─── Case Detail View ──────────────────────────────────────────
   if (selectedCase) {
@@ -663,7 +748,7 @@ export default function CaseManagement() {
         <div>
           <h2 className="text-lg font-semibold font-sans text-foreground">Case Management</h2>
           <p className="text-xs text-muted-foreground font-sans mt-0.5">
-            {cases.length} total cases · {cases.filter(c => c.status === 'Active').length} active · {cases.filter(c => c.priority === 'Critical').length} critical
+            {caseList.length} total cases · {caseList.filter(c => c.status === 'Active').length} active · {caseList.filter(c => c.priority === 'Critical').length} critical
           </p>
         </div>
         <Button
@@ -681,7 +766,7 @@ export default function CaseManagement() {
           <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 font-sans">Status Pipeline</p>
           <div className="grid grid-cols-3 lg:grid-cols-6 gap-2">
             {pipelineStages.map(stage => {
-              const count = cases.filter(c => c.status === stage.status).length;
+              const count = caseList.filter(c => c.status === stage.status).length;
               return (
                 <button
                   key={stage.label}
@@ -874,26 +959,26 @@ export default function CaseManagement() {
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label className="text-xs font-sans">Case Title *</Label>
-              <Input placeholder="e.g., Ahmed v. State Bank of Pakistan" className="h-9 text-sm font-sans" />
+              <Input value={newCaseData.title} onChange={e => setNewCaseData({...newCaseData, title: e.target.value})} placeholder="e.g., Ahmed v. State Bank of Pakistan" className="h-9 text-sm font-sans" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Case Number *</Label>
-                <Input placeholder="e.g., WP No. 12345/2024" className="h-9 text-sm font-sans" />
+                <Input value={newCaseData.caseNumber} onChange={e => setNewCaseData({...newCaseData, caseNumber: e.target.value})} placeholder="e.g., WP No. 12345/2024" className="h-9 text-sm font-sans" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">FIR Number</Label>
-                <Input placeholder="Optional" className="h-9 text-sm font-sans" />
+                <Input value={newCaseData.firNumber} onChange={e => setNewCaseData({...newCaseData, firNumber: e.target.value})} placeholder="Optional" className="h-9 text-sm font-sans" />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-sans">Client Name *</Label>
-              <Input placeholder="Client or company name" className="h-9 text-sm font-sans" />
+              <Input value={newCaseData.client} onChange={e => setNewCaseData({...newCaseData, client: e.target.value})} placeholder="Client or company name" className="h-9 text-sm font-sans" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Court *</Label>
-                <Select>
+                <Select value={newCaseData.court} onValueChange={val => setNewCaseData({...newCaseData, court: val})}>
                   <SelectTrigger className="h-9 text-xs font-sans">
                     <SelectValue placeholder="Select court" />
                   </SelectTrigger>
@@ -906,7 +991,7 @@ export default function CaseManagement() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Case Type *</Label>
-                <Select>
+                <Select value={newCaseData.type} onValueChange={val => setNewCaseData({...newCaseData, type: val})}>
                   <SelectTrigger className="h-9 text-xs font-sans">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
@@ -921,17 +1006,17 @@ export default function CaseManagement() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Assigned Judge</Label>
-                <Input placeholder="Judge name" className="h-9 text-sm font-sans" />
+                <Input value={newCaseData.judge} onChange={e => setNewCaseData({...newCaseData, judge: e.target.value})} placeholder="Judge name" className="h-9 text-sm font-sans" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Opposing Counsel</Label>
-                <Input placeholder="Counsel name" className="h-9 text-sm font-sans" />
+                <Input value={newCaseData.opposingCounsel} onChange={e => setNewCaseData({...newCaseData, opposingCounsel: e.target.value})} placeholder="Counsel name" className="h-9 text-sm font-sans" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Priority</Label>
-                <Select>
+                <Select value={newCaseData.priority} onValueChange={val => setNewCaseData({...newCaseData, priority: val})}>
                   <SelectTrigger className="h-9 text-xs font-sans">
                     <SelectValue placeholder="Select priority" />
                   </SelectTrigger>
@@ -944,20 +1029,20 @@ export default function CaseManagement() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Next Hearing Date</Label>
-                <Input type="date" className="h-9 text-sm font-sans" />
+                <Input type="date" value={newCaseData.nextHearing} onChange={e => setNewCaseData({...newCaseData, nextHearing: e.target.value})} className="h-9 text-sm font-sans" />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-sans">Case Description</Label>
-              <Textarea placeholder="Brief summary of the case..." className="text-sm font-sans min-h-[80px] resize-none" />
+              <Textarea value={newCaseData.description} onChange={e => setNewCaseData({...newCaseData, description: e.target.value})} placeholder="Brief summary of the case..." className="text-sm font-sans min-h-[80px] resize-none" />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" className="font-sans text-xs" onClick={() => setShowNewCase(false)}>
               Cancel
             </Button>
-            <Button size="sm" className="bg-gradient-primary font-sans text-xs gap-1.5" onClick={() => setShowNewCase(false)}>
-              <Plus className="h-3.5 w-3.5" /> Create Case
+            <Button size="sm" className="bg-gradient-primary font-sans text-xs gap-1.5" onClick={handleAddCase} disabled={addingCase || !newCaseData.title || !newCaseData.caseNumber || !newCaseData.client}>
+              {addingCase ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Create Case
             </Button>
           </DialogFooter>
         </DialogContent>

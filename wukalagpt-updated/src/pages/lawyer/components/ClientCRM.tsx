@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,8 +17,9 @@ import {
   MessageSquare, ArrowLeft, Calendar, Clock, FileText, Shield,
   AlertTriangle, Tag, UserCheck, Eye, Send, PhoneCall, Video,
   Users, TrendingUp, UserPlus, Bell, CreditCard, ChevronRight,
-  CheckCircle2, XCircle, Edit, Trash2
+  CheckCircle2, XCircle, Edit, Trash2, Loader2
 } from 'lucide-react';
+import api from '@/services/api';
 
 // ─── Types ────────────────────────────────────────────────────────
 interface Interaction {
@@ -216,20 +217,98 @@ export default function ClientCRM() {
   const [conflictQuery, setConflictQuery] = useState('');
   const [newInteraction, setNewInteraction] = useState({ type: 'call', summary: '' });
 
+  // Dynamic states
+  const [loading, setLoading] = useState(true);
+  const [clientList, setClientList] = useState<Client[]>([]);
+  const [clientStats, setClientStats] = useState<any>(null);
+
+  // Invite/add client form state
+  const [newClientData, setNewClientData] = useState({
+    name: '',
+    contact: '',
+    cnic: '',
+    email: '',
+    phone: '',
+    whatsapp: '',
+    city: '',
+    address: '',
+    vip: false,
+    tags: [] as string[]
+  });
+  const [addingClient, setAddingClient] = useState(false);
+
+  useEffect(() => {
+    async function loadClients() {
+      try {
+        setLoading(true);
+        const [clientsRes, statsRes] = await Promise.allSettled([
+          api.getClients(),
+          api.getClientStats()
+        ]);
+
+        if (clientsRes.status === 'fulfilled' && clientsRes.value && clientsRes.value.length > 0) {
+          setClientList(clientsRes.value);
+        } else {
+          setClientList(clients);
+        }
+
+        if (statsRes.status === 'fulfilled' && statsRes.value) {
+          setClientStats(statsRes.value);
+        }
+      } catch (err) {
+        console.error("Failed to load secure CRM directory. Reverting to offline premium client view", err);
+        setClientList(clients);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadClients();
+  }, []);
+
+  const handleAddClient = async () => {
+    try {
+      setAddingClient(true);
+      await api.createClient(newClientData);
+      setShowAddClient(false);
+      // Reset form
+      setNewClientData({
+        name: '',
+        contact: '',
+        cnic: '',
+        email: '',
+        phone: '',
+        whatsapp: '',
+        city: '',
+        address: '',
+        vip: false,
+        tags: []
+      });
+      // Refresh list
+      const updatedList = await api.getClients();
+      if (updatedList && updatedList.length > 0) {
+        setClientList(updatedList);
+      }
+    } catch (err) {
+      console.error("Failed to create client", err);
+    } finally {
+      setAddingClient(false);
+    }
+  };
+
   // Conflict check logic
   const conflictResults = useMemo(() => {
     if (!conflictQuery.trim()) return [];
     const q = conflictQuery.toLowerCase();
-    return clients.filter(c =>
+    return clientList.filter(c =>
       c.name.toLowerCase().includes(q) ||
       c.contact.toLowerCase().includes(q) ||
       c.cnic.includes(conflictQuery)
     );
-  }, [conflictQuery]);
+  }, [conflictQuery, clientList]);
 
   // Filtered clients
   const filtered = useMemo(() => {
-    return clients.filter(c => {
+    return clientList.filter(c => {
       const matchSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         c.contact.toLowerCase().includes(searchQuery.toLowerCase()) ||
         c.cnic.includes(searchQuery);
@@ -239,15 +318,27 @@ export default function ClientCRM() {
       if (tab === 'retention') return matchSearch && matchTag && c.retentionAlert;
       return matchSearch && matchTag && c.status.toLowerCase() === tab;
     });
-  }, [searchQuery, tab, tagFilter]);
+  }, [searchQuery, tab, tagFilter, clientList]);
 
   // Stats
-  const stats = useMemo(() => ({
-    total: clients.length,
-    active: clients.filter(c => c.status === 'Active').length,
-    vip: clients.filter(c => c.vip).length,
-    retentionAlerts: clients.filter(c => c.retentionAlert).length,
-  }), []);
+  const stats = useMemo(() => {
+    if (clientStats) return clientStats;
+    return {
+      total: clientList.length,
+      active: clientList.filter(c => c.status === 'Active').length,
+      vip: clientList.filter(c => c.vip).length,
+      retentionAlerts: clientList.filter(c => c.retentionAlert).length,
+    };
+  }, [clientList, clientStats]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground font-sans">Connecting to secure client CRM directory...</p>
+      </div>
+    );
+  }
 
   // ── Detail View ───────────────────────────────────────────────
   if (selectedClient) {
@@ -759,36 +850,36 @@ export default function ClientCRM() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-sans font-medium text-foreground mb-1 block">Full Name / Company *</label>
-                <Input placeholder="e.g., Khan Industries Ltd." className="h-9 text-xs font-sans" />
+                <Input value={newClientData.name} onChange={e => setNewClientData({...newClientData, name: e.target.value})} placeholder="e.g., Khan Industries Ltd." className="h-9 text-xs font-sans" />
               </div>
               <div>
                 <label className="text-xs font-sans font-medium text-foreground mb-1 block">Contact Person *</label>
-                <Input placeholder="e.g., Imran Khan" className="h-9 text-xs font-sans" />
+                <Input value={newClientData.contact} onChange={e => setNewClientData({...newClientData, contact: e.target.value})} placeholder="e.g., Imran Khan" className="h-9 text-xs font-sans" />
               </div>
             </div>
             <div>
               <label className="text-xs font-sans font-medium text-foreground mb-1 block">CNIC Number *</label>
-              <Input placeholder="XXXXX-XXXXXXX-X" className="h-9 text-xs font-sans" />
+              <Input value={newClientData.cnic} onChange={e => setNewClientData({...newClientData, cnic: e.target.value})} placeholder="XXXXX-XXXXXXX-X" className="h-9 text-xs font-sans" />
               <p className="text-[10px] text-muted-foreground font-sans mt-1">Pakistani CNIC format: 35202-1234567-1</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-sans font-medium text-foreground mb-1 block">Email</label>
-                <Input placeholder="email@example.com" className="h-9 text-xs font-sans" />
+                <Input value={newClientData.email} onChange={e => setNewClientData({...newClientData, email: e.target.value})} placeholder="email@example.com" className="h-9 text-xs font-sans" />
               </div>
               <div>
                 <label className="text-xs font-sans font-medium text-foreground mb-1 block">Phone *</label>
-                <Input placeholder="+92 3XX XXXXXXX" className="h-9 text-xs font-sans" />
+                <Input value={newClientData.phone} onChange={e => setNewClientData({...newClientData, phone: e.target.value})} placeholder="+92 3XX XXXXXXX" className="h-9 text-xs font-sans" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-sans font-medium text-foreground mb-1 block">WhatsApp</label>
-                <Input placeholder="+92 3XX XXXXXXX" className="h-9 text-xs font-sans" />
+                <Input value={newClientData.whatsapp} onChange={e => setNewClientData({...newClientData, whatsapp: e.target.value})} placeholder="+92 3XX XXXXXXX" className="h-9 text-xs font-sans" />
               </div>
               <div>
                 <label className="text-xs font-sans font-medium text-foreground mb-1 block">City *</label>
-                <Select>
+                <Select value={newClientData.city} onValueChange={val => setNewClientData({...newClientData, city: val})}>
                   <SelectTrigger className="h-9 text-xs font-sans"><SelectValue placeholder="Select city" /></SelectTrigger>
                   <SelectContent>
                     {['Lahore', 'Karachi', 'Islamabad', 'Rawalpindi', 'Faisalabad', 'Multan', 'Peshawar', 'Quetta'].map(c => (
@@ -800,20 +891,35 @@ export default function ClientCRM() {
             </div>
             <div>
               <label className="text-xs font-sans font-medium text-foreground mb-1 block">Address</label>
-              <Textarea placeholder="Full address" className="text-xs min-h-[60px] font-sans" />
+              <Textarea value={newClientData.address} onChange={e => setNewClientData({...newClientData, address: e.target.value})} placeholder="Full address" className="text-xs min-h-[60px] font-sans" />
             </div>
             <div>
               <label className="text-xs font-sans font-medium text-foreground mb-1 block">Client Tags</label>
               <div className="flex flex-wrap gap-1.5">
-                {allTags.map(tag => (
-                  <Badge key={tag} variant="outline" className="text-[10px] h-5 cursor-pointer hover:bg-primary/10 transition-colors">
-                    {tag}
-                  </Badge>
-                ))}
+                {allTags.map(tag => {
+                  const active = newClientData.tags.includes(tag);
+                  return (
+                    <Badge
+                      key={tag}
+                      variant={active ? "default" : "outline"}
+                      className={`text-[10px] h-5 cursor-pointer transition-colors ${
+                        active ? "bg-primary text-primary-foreground" : "hover:bg-primary/10"
+                      }`}
+                      onClick={() => {
+                        const tags = active
+                          ? newClientData.tags.filter(t => t !== tag)
+                          : [...newClientData.tags, tag];
+                        setNewClientData({ ...newClientData, tags });
+                      }}
+                    >
+                      {tag}
+                    </Badge>
+                  );
+                })}
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <input type="checkbox" id="vip" className="rounded border-border" />
+              <input type="checkbox" id="vip" checked={newClientData.vip} onChange={e => setNewClientData({...newClientData, vip: e.target.checked})} className="rounded border-border" />
               <label htmlFor="vip" className="text-xs font-sans">Mark as VIP client</label>
             </div>
             <div className="flex items-center gap-2">
@@ -823,7 +929,9 @@ export default function ClientCRM() {
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" className="text-xs" onClick={() => setShowAddClient(false)}>Cancel</Button>
-            <Button size="sm" className="text-xs bg-primary" onClick={() => setShowAddClient(false)}>Create Client</Button>
+            <Button size="sm" className="text-xs bg-primary gap-1.5" onClick={handleAddClient} disabled={addingClient || !newClientData.name || !newClientData.contact}>
+              {addingClient && <Loader2 className="h-3 w-3 animate-spin" />} Create Client
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -287,6 +287,15 @@ export const api = {
     }, true);
   },
 
+  /**
+   * Get lawyer dashboard overview statistics and items
+   */
+  getLawyerDashboardOverview: async () => {
+    return request<any>('/Dashboard/lawyer-overview', {
+      method: 'GET',
+    }, true);
+  },
+
   // --- Experience ---
   addExperience: async (data: ExperienceRequest) => {
     return request<ExperienceResponse>('/Lawyers/me/experience', {
@@ -362,8 +371,8 @@ export const api = {
     return res.map(app => ({
       ...app,
       fullName: app.fullName || `${app.firstName || ''} ${app.lastName || ''}`.trim() || 'Unnamed',
-      degree: app.degree || app.degreeFileUrl,
-      introVideo: app.introVideo || app.introVideoUrl,
+      degree: app.degree || app.degreeFileUrl || app.DegreeFileUrl || app.degreeDocument || app.DegreeDocument,
+      introVideo: app.introVideo || app.introVideoUrl || app.IntroVideoUrl || app.video || app.Video,
       status: app.status ?? app.verificationStatus,
       submittedAt: app.submittedAt || app.createdAt || new Date().toISOString(),
     })) as LawyerApplication[];
@@ -571,15 +580,6 @@ export const api = {
 
   // ==================== DASHBOARD ENDPOINTS ====================
 
-  /**
-   * Get lawyer dashboard overview data
-   */
-  getLawyerDashboardOverview: async () => {
-    return request<any>('/Dashboard/lawyer-overview', {
-      method: 'GET',
-    }, true);
-  },
-
   // ==================== NOTIFICATION ENDPOINTS ====================
 
   /**
@@ -732,6 +732,328 @@ export const api = {
   deleteAiChatSession: async (sessionId: string) => {
     return request<void>(`/AiChat/sessions/${sessionId}`, {
       method: 'DELETE',
+    }, true);
+  },
+
+  // ==================== PRACTICE ANALYTICS ENDPOINTS ====================
+  getPracticeAnalyticsOverview: async (period: string = '12m') => {
+    return request<any>('/Analytics/overview', {
+      method: 'GET',
+      params: { period },
+    }, true);
+  },
+
+  getPracticeAnalyticsWorkload: async () => {
+    return request<any>('/Analytics/workload', {
+      method: 'GET',
+    }, true);
+  },
+
+  getPracticeAnalyticsClients: async () => {
+    return request<any>('/Analytics/clients', {
+      method: 'GET',
+    }, true);
+  },
+
+  // ==================== TEAM MANAGEMENT ENDPOINTS ====================
+  getTeamMembers: async () => {
+    return request<any[]>('/Team/members', {
+      method: 'GET',
+    }, true);
+  },
+
+  inviteTeamMember: async (data: { email: string; role: number }) => {
+    return request<any>('/Team/invite', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  getTeamTasks: async () => {
+    return request<any[]>('/Team/tasks', {
+      method: 'GET',
+    }, true);
+  },
+
+  createTeamTask: async (data: any) => {
+    return request<any>('/Team/tasks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  updateTeamTaskStatus: async (id: string, status: string) => {
+    return request<any>(`/Team/tasks/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify(status),
+    }, true);
+  },
+
+  getTeamActivity: async () => {
+    return request<any[]>('/Team/activity', {
+      method: 'GET',
+    }, true);
+  },
+
+  // ==================== CLIENT CRM ENDPOINTS ====================
+  getClients: async (params?: any) => {
+    return request<any>('/Clients', {
+      method: 'GET',
+      params,
+    }, true);
+  },
+
+  createClient: async (data: any) => {
+    return request<any>('/Clients', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  getClientDetail: async (id: string) => {
+    return request<any>(`/Clients/${id}`, {
+      method: 'GET',
+    }, true);
+  },
+
+  updateClient: async (id: string, data: any) => {
+    return request<any>(`/Clients/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  archiveClient: async (id: string) => {
+    return request<any>(`/Clients/${id}`, {
+      method: 'DELETE',
+    }, true);
+  },
+
+  getClientStats: async () => {
+    return request<any>('/Clients/stats', {
+      method: 'GET',
+    }, true);
+  },
+
+  runConflictCheck: async (data: any) => {
+    return request<any>('/Clients/conflict-check', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  getClientInteractions: async (id: string, type?: string) => {
+    return request<any[]>(`/Clients/${id}/interactions`, {
+      method: 'GET',
+      params: { type },
+    }, true);
+  },
+
+  logClientInteraction: async (id: string, data: any) => {
+    return request<any>(`/Clients/${id}/interactions`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  dismissClientRetention: async (id: string) => {
+    return request<any>(`/Clients/${id}/dismiss-retention-alert`, {
+      method: 'PATCH',
+    }, true);
+  },
+
+  shareDocumentToPortal: async (id: string, docId: string, data: any) => {
+    return request<any>(`/Clients/${id}/portal-access/documents/${docId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  revokeDocumentAccess: async (id: string, docId: string) => {
+    return request<any>(`/Clients/${id}/portal-access/documents/${docId}`, {
+      method: 'DELETE',
+    }, true);
+  },
+
+  // ==================== CASE MANAGEMENT ENDPOINTS ====================
+  getCases: async (params?: any) => {
+    return request<any>('/Cases', {
+      method: 'GET',
+      params,
+    }, true);
+  },
+
+  createCase: async (data: any) => {
+    return request<any>('/Cases', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  getCase: async (id: string) => {
+    return request<any>(`/Cases/${id}`, {
+      method: 'GET',
+    }, true);
+  },
+
+  updateCase: async (id: string, data: any) => {
+    return request<any>(`/Cases/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  archiveCase: async (id: string) => {
+    return request<any>(`/Cases/${id}`, {
+      method: 'DELETE',
+    }, true);
+  },
+
+  getCaseTimeline: async (id: string) => {
+    return request<any[]>(`/Cases/${id}/timeline`, {
+      method: 'GET',
+    }, true);
+  },
+
+  addCaseTimelineEvent: async (id: string, data: any) => {
+    return request<any>(`/Cases/${id}/timeline`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  getCaseNotes: async (id: string) => {
+    return request<any[]>(`/Cases/${id}/notes`, {
+      method: 'GET',
+    }, true);
+  },
+
+  addCaseNote: async (id: string, data: any) => {
+    return request<any>(`/Cases/${id}/notes`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  updateCaseNote: async (id: string, noteId: string, data: any) => {
+    return request<any>(`/Cases/${id}/notes/${noteId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  deleteCaseNote: async (id: string, noteId: string) => {
+    return request<any>(`/Cases/${id}/notes/${noteId}`, {
+      method: 'DELETE',
+    }, true);
+  },
+
+  getCaseDeadlines: async (id: string) => {
+    return request<any[]>(`/Cases/${id}/deadlines`, {
+      method: 'GET',
+    }, true);
+  },
+
+  createCaseDeadline: async (id: string, data: any) => {
+    return request<any>(`/Cases/${id}/deadlines`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  updateCaseDeadline: async (id: string, dlId: string, data: any) => {
+    return request<any>(`/Cases/${id}/deadlines/${dlId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  deleteCaseDeadline: async (id: string, dlId: string) => {
+    return request<any>(`/Cases/${id}/deadlines/${dlId}`, {
+      method: 'DELETE',
+    }, true);
+  },
+
+  getCaseAssignments: async (id: string) => {
+    return request<any[]>(`/Cases/${id}/assignments`, {
+      method: 'GET',
+    }, true);
+  },
+
+  assignTeamMember: async (id: string, data: any) => {
+    return request<any>(`/Cases/${id}/assignments`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  removeTeamMember: async (id: string, uid: string) => {
+    return request<any>(`/Cases/${id}/assignments/${uid}`, {
+      method: 'DELETE',
+    }, true);
+  },
+
+  linkCase: async (id: string, data: any) => {
+    return request<any>(`/Cases/${id}/link`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  // ==================== CALENDAR / HEARINGS ENDPOINTS ====================
+  getCalendarFeed: async (params?: any) => {
+    return request<any>('/Hearings', {
+      method: 'GET',
+      params,
+    }, true);
+  },
+
+  createHearing: async (data: any) => {
+    return request<any>('/Hearings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  adjournHearing: async (id: string, data: any) => {
+    return request<any>(`/Hearings/${id}/adjourn`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  completeHearing: async (id: string, data: any) => {
+    return request<any>(`/Hearings/${id}/complete`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  cancelHearing: async (id: string, data: any) => {
+    return request<any>(`/Hearings/${id}`, {
+      method: 'DELETE',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  checkHearingConflicts: async (params: any) => {
+    return request<any>('/Hearings/conflicts', {
+      method: 'GET',
+      params,
+    }, true);
+  },
+
+  exportHearings: async (params: any) => {
+    return request<any>('/Hearings/export', {
+      method: 'GET',
+      params,
+    }, true);
+  },
+
+  getHearingStats: async (params?: any) => {
+    return request<any>('/Hearings/stats', {
+      method: 'GET',
+      params,
     }, true);
   },
 };

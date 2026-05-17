@@ -24,6 +24,10 @@ public class PlatformStatsDto
 {
     public int TotalLawyers { get; set; }
     public int PendingLawyerApprovals { get; set; }
+    public int ApprovedVerifications { get; set; }
+    public int RejectedVerifications { get; set; }
+    public int ActiveChats { get; set; }
+    public int TotalDocuments { get; set; }
     public int TotalClients { get; set; }
     public int TotalActiveUsers { get; set; }
     public int TotalSuspendedUsers { get; set; }

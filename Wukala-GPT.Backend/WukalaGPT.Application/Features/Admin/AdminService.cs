@@ -251,15 +251,24 @@ public class AdminService : IAdminService
     {
         int totalLawyers = await _context.Users.CountAsync(u => u.Role == UserRole.Lawyer);
         int pendingApprovals = await _context.LawyerProfiles.CountAsync(l => l.VerificationStatus == VerificationStatus.Pending);
+        int approvedVerifications = await _context.LawyerProfiles.CountAsync(l => l.VerificationStatus == VerificationStatus.Approved);
+        int rejectedVerifications = await _context.LawyerProfiles.CountAsync(l => l.VerificationStatus == VerificationStatus.Rejected);
         int totalClients = await _context.Users.CountAsync(u => u.Role == UserRole.Client);
         
         int totalActive = await _context.Users.CountAsync(u => u.IsActive);
         int totalSuspended = await _context.Users.CountAsync(u => !u.IsActive);
 
+        int activeChats = await _context.ChatSessions.CountAsync() + await _context.Conversations.CountAsync();
+        int totalDocuments = await _context.LegalDocuments.CountAsync();
+
         return new PlatformStatsDto
         {
             TotalLawyers = totalLawyers,
             PendingLawyerApprovals = pendingApprovals,
+            ApprovedVerifications = approvedVerifications,
+            RejectedVerifications = rejectedVerifications,
+            ActiveChats = activeChats,
+            TotalDocuments = totalDocuments,
             TotalClients = totalClients,
             TotalActiveUsers = totalActive,
             TotalSuspendedUsers = totalSuspended

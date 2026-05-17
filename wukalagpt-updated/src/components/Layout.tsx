@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import logo from '@/assets/Wukala-GPT-Logo-Green.jpg';
 import PageTransition from './PageTransition';
 import MobileBottomNav from './MobileBottomNav';
@@ -75,9 +76,6 @@ const clientNavigation = [
   { name: 'Messages', href: '/messages', icon: MessageSquare },
   { name: 'Documents', href: '/documents', icon: FileText },
   { name: 'Find Lawyers', href: '/lawyers', icon: Users },
-  { name: 'Case Law', href: '/case-law', icon: Gavel },
-  { name: 'Legal News', href: '/news', icon: Newspaper },
-  { name: 'Dictionary', href: '/dictionary', icon: BookOpen },
 ];
 
 const lawyerNavigation = [
@@ -86,9 +84,6 @@ const lawyerNavigation = [
   { name: 'Messages', href: '/messages', icon: MessageSquare },
   { name: 'Documents', href: '/documents', icon: FileText },
   { name: 'Find Lawyers', href: '/lawyers', icon: Users },
-  { name: 'Case Law', href: '/case-law', icon: Gavel },
-  { name: 'Legal News', href: '/news', icon: Newspaper },
-  { name: 'Dictionary', href: '/dictionary', icon: BookOpen },
 ];
 
 const adminNavigation = [
@@ -159,7 +154,7 @@ const pricingPlans = [
   },
 ];
 export default function Layout({ children }: LayoutProps) {
-  const [isDark, setIsDark] = useState(true);
+  const { isDark, toggleTheme } = useTheme();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const hasNavigated = useRef(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -316,13 +311,7 @@ export default function Layout({ children }: LayoutProps) {
     };
   }, [location.pathname, renderIntroLoader]);
 
-  useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDark]);
+  // Theme sync handled by global ThemeProvider
 
   useEffect(() => {
     if (prefersReducedMotion.current) return;
@@ -366,9 +355,7 @@ export default function Layout({ children }: LayoutProps) {
     return () => observer.disconnect();
   }, [location.pathname]);
 
-  const toggleTheme = () => {
-    setIsDark((prev) => !prev);
-  };
+  // Using global toggleTheme from context
 
   return (
     <div className="min-h-screen bg-background">
@@ -451,38 +438,7 @@ export default function Layout({ children }: LayoutProps) {
               );
             })}
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    'group relative flex items-center space-x-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all duration-300 border border-transparent',
-                    isHelpRoute
-                      ? 'bg-gradient-to-r from-amber-500/85 via-amber-400/80 to-amber-300/80 text-amber-950 shadow-[0_8px_24px_rgba(251,191,36,0.25)] ring-1 ring-amber-300/70'
-                      : 'text-muted-foreground hover:text-foreground hover:shadow-[0_8px_24px_rgba(251,191,36,0.15)] hover:border-amber-300/40 hover:bg-gradient-to-r hover:from-amber-500/8 hover:to-amber-400/4'
-                  )}
-                >
-                  <span className="relative flex items-center gap-1">
-                    <HelpCircle className="h-3.5 w-3.5" />
-                    <span>Help</span>
-                    <ChevronDown className="h-3 w-3 transition-transform group-data-[state=open]:rotate-180" />
-                  </span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 rounded-2xl border border-border/70 bg-background/95 backdrop-blur p-2 shadow-[0_20px_70px_rgba(0,0,0,0.25)]">
-                {helpMenuItems.map((item) => (
-                  <DropdownMenuItem asChild key={item.name} className="rounded-lg">
-                    <Link
-                      to={item.href}
-                      className="flex items-center gap-2 text-xs"
-                    >
-                      <item.icon className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span>{item.name}</span>
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+
           </nav>
 
           {/* Right side actions */}
@@ -602,27 +558,7 @@ export default function Layout({ children }: LayoutProps) {
                     </Link>
                   );
                 })}
-                <div className="pt-4 mt-2 border-t border-border/60">
-                  <p className="px-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground mb-2">Help</p>
-                  <div className="flex flex-col space-y-2">
-                    {helpMenuItems.map((item) => (
-                      <Link
-                        key={item.name}
-                        to={item.href}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className={cn(
-                          'flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
-                          location.pathname === item.href
-                            ? 'bg-primary/90 text-primary-foreground'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                        )}
-                      >
-                        <item.icon className="h-4 w-4" />
-                        <span>{item.name}</span>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
+
                 <div className="mt-4 space-y-2">
                   <Button asChild variant="outline" className="w-full">
                     <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>Sign In</Link>
@@ -823,7 +759,6 @@ export default function Layout({ children }: LayoutProps) {
                 <p className="text-sm font-semibold text-foreground">Platform</p>
                 <div className="grid gap-2 text-sm">
                   <a href="#" className="hover:text-foreground transition-colors">AI Assistant</a>
-                  <a href="#" className="hover:text-foreground transition-colors">Case Law Explorer</a>
                   <a href="#" className="hover:text-foreground transition-colors">Document Workspace</a>
                   <a href="#" className="hover:text-foreground transition-colors">Secure Messaging</a>
                   <a href="#" className="hover:text-foreground transition-colors">Compliance Controls</a>
@@ -837,7 +772,6 @@ export default function Layout({ children }: LayoutProps) {
                   <Link to="/security-privacy" className="hover:text-foreground transition-colors">Security & Privacy</Link>
                   <Link to="/pakistan-laws" className="hover:text-foreground transition-colors">Pakistan Laws Overview</Link>
                   <Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
-                  <Link to="/help" className="hover:text-foreground transition-colors">Help & Support</Link>
                   <Link to="/contact" className="hover:text-foreground transition-colors">Contact Us</Link>
                 </div>
               </div>

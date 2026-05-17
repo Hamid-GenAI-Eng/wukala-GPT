@@ -24,15 +24,11 @@ const clientNav = [
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Docs', href: '/documents', icon: FileText },
   { name: 'Lawyers', href: '/lawyers', icon: Users },
-  { name: 'Case Law', href: '/case-law', icon: Gavel },
-  { name: 'News', href: '/news', icon: Newspaper },
 ];
 
 const lawyerNav = [
   { name: 'Chat', href: '/chat', icon: MessageSquare },
   { name: 'Docs', href: '/documents', icon: FileText },
-  { name: 'Case Law', href: '/case-law', icon: Gavel },
-  { name: 'News', href: '/news', icon: Newspaper },
   { name: 'Profile', href: '/lawyer-profile', icon: User },
 ];
 

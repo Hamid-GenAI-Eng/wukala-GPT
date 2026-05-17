@@ -54,9 +54,11 @@ export default function DocumentDrafting() {
 
   const fetchTemplates = async () => {
     try {
-      const token = localStorage.getItem('token');
-      // Using WukalaGPT Backend URL
-      const response = await fetch('http://localhost:5169/api/document-drafting/templates', {
+      const token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token');
+      const baseUrl = import.meta.env.VITE_API_BASE_URL 
+        ? import.meta.env.VITE_API_BASE_URL.replace('/api', '') 
+        : 'http://localhost:5169';
+      const response = await fetch(`${baseUrl}/api/document-drafting/templates`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) {
@@ -75,8 +77,11 @@ export default function DocumentDrafting() {
     
     setIsDrafting(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5169/api/document-drafting/generate', {
+      const token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token');
+      const baseUrl = import.meta.env.VITE_API_BASE_URL 
+        ? import.meta.env.VITE_API_BASE_URL.replace('/api', '') 
+        : 'http://localhost:5169';
+      const response = await fetch(`${baseUrl}/api/document-drafting/generate`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
@@ -103,8 +108,11 @@ export default function DocumentDrafting() {
 
   const handleExportDocx = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5169/api/document-drafting/export', {
+      const token = sessionStorage.getItem('auth_token') || localStorage.getItem('auth_token');
+      const baseUrl = import.meta.env.VITE_API_BASE_URL 
+        ? import.meta.env.VITE_API_BASE_URL.replace('/api', '') 
+        : 'http://localhost:5169';
+      const response = await fetch(`${baseUrl}/api/document-drafting/export`, {
         method: 'POST',
         headers: { 
           'Authorization': `Bearer ${token}`,
