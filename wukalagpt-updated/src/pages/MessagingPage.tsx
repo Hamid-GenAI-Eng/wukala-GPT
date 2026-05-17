@@ -26,6 +26,28 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 
+const formatSafeDistance = (dateString?: string) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '';
+  try {
+    return formatDistanceToNow(date, { addSuffix: true });
+  } catch {
+    return '';
+  }
+};
+
+const formatSafeDistanceNoSuffix = (dateString?: string) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '';
+  try {
+    return formatDistanceToNow(date, { addSuffix: false });
+  } catch {
+    return '';
+  }
+};
+
 export default function MessagingPage() {
   const { user, token } = useAuth();
   const [searchParams] = useSearchParams();
@@ -73,14 +95,42 @@ export default function MessagingPage() {
 
   // Handle direct navigation to a chat
   useEffect(() => {
-    if (targetLawyerId && conversations.length > 0) {
-      const existing = conversations.find(c => c.targetUserId === targetLawyerId);
-      if (existing) {
-        setSelectedConversation(existing);
-        setShowMobileChat(true);
+    const initDirectChat = async () => {
+      if (targetLawyerId && conversations.length > 0) {
+        const existing = conversations.find(c => c.targetUserId === targetLawyerId);
+        if (existing) {
+          setSelectedConversation(existing);
+          fetchMessages(existing.id);
+          setShowMobileChat(true);
+        } else {
+          // If no existing conversation, fetch lawyer details to create a temporary conversation
+          try {
+            const lawyer = await api.getPublicLawyer(targetLawyerId);
+            if (lawyer) {
+              const tempConv: Conversation = {
+                id: `temp-${targetLawyerId}`,
+                targetUserId: targetLawyerId,
+                targetUserName: lawyer.fullName,
+                targetUserAvatar: lawyer.profileImage,
+                lastMessage: 'Start a conversation',
+                lastMessageTime: new Date().toISOString(),
+                unreadCount: 0,
+                isOnline: false,
+                isLawyer: true,
+              };
+              setConversations(prev => [tempConv, ...prev]);
+              setSelectedConversation(tempConv);
+              setMessages([]);
+              setShowMobileChat(true);
+            }
+          } catch (e) {
+            console.error("Failed to load lawyer details for direct message", e);
+          }
+        }
       }
-    }
-  }, [targetLawyerId, conversations]);
+    };
+    initDirectChat();
+  }, [targetLawyerId, conversations.length]);
 
   const fetchConversations = async () => {
     try {
@@ -93,9 +143,9 @@ export default function MessagingPage() {
     }
   };
 
-  const fetchMessages = async (targetId: string) => {
+  const fetchMessages = async (conversationId: string) => {
     try {
-      const data = await api.getMessages(targetId);
+      const data = await api.getMessages(conversationId);
       setMessages(data);
       scrollToBottom();
     } catch (error) {
@@ -105,10 +155,10 @@ export default function MessagingPage() {
 
   const handleSelectConversation = (conv: Conversation) => {
     setSelectedConversation(conv);
-    fetchMessages(conv.targetUserId);
+    fetchMessages(conv.id);
     setShowMobileChat(true);
     // Mark as read
-    api.markAsRead(conv.targetUserId);
+    api.markAsRead(conv.id);
   };
 
   const handleSendMessage = async () => {
@@ -119,18 +169,28 @@ export default function MessagingPage() {
     setNewMessage('');
 
     try {
+      if (selectedConversation.id.startsWith('temp-')) {
+        throw new Error("Temporary conversation");
+      }
       // Try SignalR first for "real-time" feel
       await chatService.sendMessage(selectedConversation.targetUserId, content);
-      
-      // Optimistically add to UI if SignalR doesn't echo back immediately
-      // Actually, standard SignalR usually relies on the hub echoing it to everyone in the group
       
     } catch (error) {
       // Fallback to HTTP API
       try {
         const sentMsg = await api.sendMessage(selectedConversation.targetUserId, content);
-        setMessages(prev => [...prev, sentMsg]);
-        scrollToBottom();
+        if (selectedConversation.id.startsWith('temp-')) {
+          await fetchConversations();
+          const updatedConvs = await api.getConversations();
+          const realConv = updatedConvs.find(c => c.targetUserId === selectedConversation.targetUserId);
+          if (realConv) {
+            setSelectedConversation(realConv);
+            fetchMessages(realConv.id);
+          }
+        } else {
+          setMessages(prev => [...prev, sentMsg]);
+          scrollToBottom();
+        }
       } catch (httpError) {
         toast.error("Failed to send message");
         setNewMessage(content); // Restore message
@@ -226,7 +286,7 @@ export default function MessagingPage() {
                     <div className="flex items-center justify-between">
                       <h3 className="font-bold text-sm truncate text-foreground/90">{conv.targetUserName}</h3>
                       <span className="text-[10px] uppercase font-bold text-muted-foreground">
-                        {conv.lastMessageTime ? formatDistanceToNow(new Date(conv.lastMessageTime), { addSuffix: true }) : ''}
+                        {formatSafeDistance(conv.lastMessageTime)}
                       </span>
                     </div>
                     
@@ -359,7 +419,7 @@ export default function MessagingPage() {
                         isMine ? 'justify-end' : 'justify-start'
                       )}>
                         <span className="text-[10px] text-muted-foreground font-medium uppercase opacity-60">
-                          {formatDistanceToNow(new Date(message.timestamp), { addSuffix: false })}
+                          {formatSafeDistanceNoSuffix(message.timestamp)}
                         </span>
                         {isMine && (
                           <CheckCheck className={cn(

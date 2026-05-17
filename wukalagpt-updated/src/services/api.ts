@@ -496,7 +496,24 @@ export const api = {
       method: 'GET',
       params,
     }, false);
-    return Array.isArray(res) ? res : (res.items || res.Items || []);
+    const items = Array.isArray(res) ? res : (res.items || res.Items || []);
+    return items.map((item: any) => ({
+      id: item.lawyerUserId || item.id,
+      fullName: item.fullName || `${item.firstName} ${item.lastName}`.trim(),
+      profileImage: item.profilePhotoUrl || item.profileImage,
+      city: item.city,
+      degreeTitle: item.degreeTitle || '',
+      university: item.university || '',
+      bio: item.bio || '',
+      experienceYears: item.yearsOfExperience || item.experienceYears || 0,
+      rating: item.rating,
+      reviewCount: item.reviewCount || 0,
+      hourlyRate: item.consultationFee || item.hourlyRate || 0,
+      specialities: Array.isArray(item.specialities) 
+        ? item.specialities.map((s: any) => typeof s === 'string' ? { id: s, name: s } : { id: s.id || s.name || '', name: s.name || '' })
+        : [],
+      isVerified: (item.badges & 4) === 4 || item.isVerified || false,
+    }));
   },
 
   /**
@@ -506,16 +523,75 @@ export const api = {
     const res = await request<any>('/Search/lawyers', {
       method: 'GET',
     }, false);
-    return Array.isArray(res) ? res : (res.items || res.Items || []);
+    const items = Array.isArray(res) ? res : (res.items || res.Items || []);
+    return items.map((item: any) => ({
+      id: item.lawyerUserId || item.id,
+      fullName: item.fullName || `${item.firstName} ${item.lastName}`.trim(),
+      profileImage: item.profilePhotoUrl || item.profileImage,
+      city: item.city,
+      degreeTitle: item.degreeTitle || '',
+      university: item.university || '',
+      bio: item.bio || '',
+      experienceYears: item.yearsOfExperience || item.experienceYears || 0,
+      rating: item.rating,
+      reviewCount: item.reviewCount || 0,
+      hourlyRate: item.consultationFee || item.hourlyRate || 0,
+      specialities: Array.isArray(item.specialities) 
+        ? item.specialities.map((s: any) => typeof s === 'string' ? { id: s, name: s } : { id: s.id || s.name || '', name: s.name || '' })
+        : [],
+      isVerified: (item.badges & 4) === 4 || item.isVerified || false,
+    }));
   },
 
   /**
    * Get a detailed public profile for a lawyer
    */
   getPublicLawyer: async (id: string) => {
-    return request<PublicLawyerProfile>(`/Search/lawyers/${id}`, {
+    const res = await request<any>(`/Search/lawyers/${id}`, {
       method: 'GET',
     }, false);
+    if (!res) return null;
+    return {
+      id: res.lawyerUserId || res.id,
+      fullName: res.fullName || `${res.firstName} ${res.lastName}`.trim(),
+      profileImage: res.profilePhotoUrl || res.profileImage,
+      city: res.city,
+      degreeTitle: res.degreeTitle || '',
+      university: res.university || '',
+      bio: res.bio || '',
+      experienceYears: res.yearsOfExperience || res.experienceYears || 0,
+      rating: res.rating,
+      reviewCount: res.reviewCount || 0,
+      hourlyRate: res.consultationFee || res.hourlyRate || 0,
+      specialities: Array.isArray(res.specialities)
+        ? res.specialities.map((s: any) => ({ id: s.id || s.name || s, name: s.name || s }))
+        : [],
+      educations: Array.isArray(res.educations)
+        ? res.educations.map((e: any) => ({
+            id: e.id,
+            degree: e.degreeName || e.degree,
+            institution: e.instituteName || e.institution,
+            fieldOfStudy: e.fieldOfStudy || '',
+            startDate: e.startDate || '',
+            endDate: e.endDate || '',
+            grade: e.grades || e.grade || '',
+            description: e.description || '',
+          }))
+        : [],
+      experiences: Array.isArray(res.experiences)
+        ? res.experiences.map((exp: any) => ({
+            id: exp.id,
+            title: exp.role || exp.title,
+            company: exp.firmCompany || exp.company,
+            location: exp.location || '',
+            startDate: exp.startDate || '',
+            endDate: exp.endDate || '',
+            isCurrent: exp.isCurrent || false,
+            description: exp.shortBio || exp.description || '',
+          }))
+        : [],
+      isVerified: (res.badges & 4) === 4 || res.isVerified || false,
+    } as PublicLawyerProfile;
   },
 
   // ==================== SAVED PROFILE ENDPOINTS ====================
@@ -545,35 +621,64 @@ export const api = {
    * Get all active conversations for the current user
    */
   getConversations: async () => {
-    return request<Conversation[]>('/Messages/conversations', {
+    const res = await request<any>('/Messages/conversations', {
       method: 'GET',
     }, true);
+    const items = res?.items || res?.Items || [];
+    return items.map((item: any) => ({
+      id: item.id,
+      targetUserId: item.otherParticipantId,
+      targetUserName: item.otherParticipantName,
+      targetUserAvatar: item.otherParticipantPhotoUrl,
+      lastMessage: item.lastMessage?.content || 'Start a conversation',
+      lastMessageTime: item.lastMessage?.sentAt || item.lastMessageAt || '',
+      unreadCount: item.unreadCount || 0,
+      isOnline: item.isOnline || false,
+      isLawyer: true,
+    }));
   },
 
   /**
    * Get message history for a specific conversation/user
    */
-  getMessages: async (targetUserId: string) => {
-    return request<ChatMessage[]>(`/Messages/${targetUserId}`, {
+  getMessages: async (conversationId: string) => {
+    const res = await request<any>(`/Messages/conversations/${conversationId}`, {
       method: 'GET',
     }, true);
+    const items = res?.items || res?.Items || [];
+    return items.map((item: any) => ({
+      id: item.id,
+      senderId: item.senderId,
+      receiverId: item.receiverId,
+      content: item.content,
+      timestamp: item.sentAt || '',
+      isRead: item.status === 2 || item.status === 'Read',
+    }));
   },
 
   /**
    * Send a message through a standard POST request
    */
   sendMessage: async (targetUserId: string, content: string) => {
-    return request<ChatMessage>('/Messages', {
+    const res = await request<any>('/Messages', {
       method: 'POST',
-      body: JSON.stringify({ targetUserId, content }),
+      body: JSON.stringify({ receiverId: targetUserId, content }),
     }, true);
+    return {
+      id: res.id,
+      senderId: res.senderId,
+      receiverId: res.receiverId,
+      content: res.content,
+      timestamp: res.sentAt || '',
+      isRead: res.status === 2 || res.status === 'Read',
+    };
   },
 
   /**
    * Mark messages in a conversation as read
    */
-  markAsRead: async (targetUserId: string) => {
-    return request<{ message: string }>(`/Messages/${targetUserId}/read`, {
+  markAsRead: async (conversationId: string) => {
+    return request<{ message: string }>(`/Messages/conversations/${conversationId}/read`, {
       method: 'PUT',
     }, true);
   },
