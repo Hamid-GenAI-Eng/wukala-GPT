@@ -292,7 +292,7 @@ export default function MessagingPage() {
         formData.append('file', file);
 
         try {
-          const response = await api.uploadProofDocument(formData);
+          const response = await api.uploadChatAttachment(formData);
           if (response && response.url) {
             const messageContent = `🎤 Voice Message|${response.url}`;
             await submitMessage(messageContent);
@@ -370,7 +370,7 @@ export default function MessagingPage() {
     formData.append('file', file);
 
     try {
-      const response = await api.uploadProofDocument(formData);
+      const response = await api.uploadChatAttachment(formData);
       if (response && response.url) {
         const messageContent = `📄 Shared Document: ${file.name}|${response.url}`;
         await submitMessage(messageContent);
@@ -391,7 +391,14 @@ export default function MessagingPage() {
       if (selectedConversation.id.startsWith('temp-')) {
         throw new Error("Temporary conversation");
       }
-      await chatService.sendMessage(selectedConversation.targetUserId, content);
+      const sentMsg = await chatService.sendMessage(selectedConversation.targetUserId, content);
+      if (sentMsg) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === sentMsg.id)) return prev;
+          return [...prev, sentMsg];
+        });
+        scrollToBottom();
+      }
       await fetchConversations();
     } catch (error) {
       try {
@@ -405,7 +412,10 @@ export default function MessagingPage() {
             fetchMessages(realConv.id);
           }
         } else {
-          setMessages(prev => [...prev, sentMsg]);
+          setMessages(prev => {
+            if (prev.some(m => m.id === sentMsg.id)) return prev;
+            return [...prev, sentMsg];
+          });
           scrollToBottom();
         }
       } catch (httpError) {

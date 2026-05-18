@@ -298,6 +298,16 @@ export const api = {
   },
 
   /**
+   * Upload chat attachment (voice, document) - accessible to both Clients and Lawyers
+   */
+  uploadChatAttachment: async (formData: FormData) => {
+    return request<{ url: string }>('/Messages/upload', {
+      method: 'POST',
+      body: formData,
+    }, true);
+  },
+
+  /**
    * Get lawyer dashboard overview statistics and items
    */
   getLawyerDashboardOverview: async () => {

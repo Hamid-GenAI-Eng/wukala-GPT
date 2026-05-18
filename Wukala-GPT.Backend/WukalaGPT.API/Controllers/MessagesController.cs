@@ -2,6 +2,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using WukalaGPT.Application.Interfaces;
+using Microsoft.AspNetCore.SignalR;
+using WukalaGPT.API.Hubs;
+using WukalaGPT.Domain.Enums;
 
 namespace WukalaGPT.API.Controllers;
 
@@ -11,10 +14,17 @@ namespace WukalaGPT.API.Controllers;
 public class MessagesController : ControllerBase
 {
     private readonly IMessagingService _messagingService;
+    private readonly IFileStorageService _fileStorage;
+    private readonly IHubContext<ChatHub> _hubContext;
 
-    public MessagesController(IMessagingService messagingService)
+    public MessagesController(
+        IMessagingService messagingService,
+        IFileStorageService fileStorage,
+        IHubContext<ChatHub> hubContext)
     {
         _messagingService = messagingService;
+        _fileStorage = fileStorage;
+        _hubContext = hubContext;
     }
 
     [HttpPost]
@@ -27,7 +37,57 @@ public class MessagesController : ControllerBase
                 return Unauthorized();
 
             var message = await _messagingService.SendMessageAsync(senderId, request.ReceiverId, request.Content);
+
+            // Broadcast the message in real-time to both recipient and sender groups via SignalR Hub Context.
+            // Using a highly resilient payload structure with both camelCase and PascalCase properties
+            // to ensure flawless integration regardless of client-side JSON serialization/casing.
+            var broadcastPayload = new
+            {
+                id = message.Id,
+                messageId = message.Id,
+                MessageId = message.Id,
+
+                senderId = message.SenderId,
+                SenderId = message.SenderId,
+
+                receiverId = message.ReceiverId,
+                ReceiverId = message.ReceiverId,
+
+                content = message.Content,
+                Content = message.Content,
+
+                sentAt = message.SentAt,
+                SentAt = message.SentAt,
+                timestamp = message.SentAt,
+                Timestamp = message.SentAt,
+
+                isRead = message.Status == MessageStatus.Read,
+                IsRead = message.Status == MessageStatus.Read,
+                status = message.Status.ToString(),
+                Status = message.Status.ToString()
+            };
+
+            await _hubContext.Clients.Group("User_" + request.ReceiverId).SendAsync("ReceiveMessage", broadcastPayload);
+            await _hubContext.Clients.Group("User_" + senderIdString).SendAsync("ReceiveMessage", broadcastPayload);
+
             return Ok(message);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("upload")]
+    public async Task<IActionResult> UploadAttachment(IFormFile file)
+    {
+        try
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest(new { message = "No file uploaded." });
+
+            var url = await _fileStorage.UploadFileAsync(file, "chat-attachments");
+            return Ok(new { url, message = "File uploaded successfully." });
         }
         catch (Exception ex)
         {

@@ -1,4 +1,5 @@
 import * as signalR from "@microsoft/signalr";
+import { api } from "./api";
 
 export type MessageReceivedCallback = (message: any) => void;
 export type UserStatusCallback = (userId: string, isOnline: boolean) => void;
@@ -57,14 +58,11 @@ class ChatService {
   }
 
   /**
-   * Send a message in real-time
+   * Send a message securely and durably via the transactional REST API,
+   * which automatically persists to DB and triggers SignalR real-time broadcast.
    */
   public async sendMessage(receiverId: string, content: string) {
-    if (this.connection && this.connection.state === signalR.HubConnectionState.Connected) {
-      await this.connection.invoke("SendMessage", receiverId, content);
-    } else {
-      throw new Error("SignalR: Not connected");
-    }
+    return api.sendMessage(receiverId, content);
   }
 
   /**
