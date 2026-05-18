@@ -14,6 +14,18 @@ public static class FileValidationHelper
         { ".pdf", new List<byte[]> { new byte[] { 0x25, 0x50, 0x44, 0x46 } } },
         { ".doc", new List<byte[]> { new byte[] { 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1 } } },
         { ".docx", new List<byte[]> { new byte[] { 0x50, 0x4B, 0x03, 0x04 } } },
+        { ".xlsx", new List<byte[]> { new byte[] { 0x50, 0x4B, 0x03, 0x04 } } },
+        { ".pptx", new List<byte[]> { new byte[] { 0x50, 0x4B, 0x03, 0x04 } } },
+        { ".zip", new List<byte[]> { new byte[] { 0x50, 0x4B, 0x03, 0x04 } } },
+        { ".webm", new List<byte[]> { new byte[] { 0x1A, 0x45, 0xDF, 0xA3 } } }, // EBML header used by WebM and MKV
+        { ".ogg", new List<byte[]> { new byte[] { 0x4F, 0x67, 0x67, 0x53 } } },  // Ogg container header
+        { ".wav", new List<byte[]> { new byte[] { 0x52, 0x49, 0x46, 0x46 } } },  // RIFF wave header
+        { ".mp3", new List<byte[]> { 
+            new byte[] { 0x49, 0x44, 0x33 }, // ID3v2 container header
+            new byte[] { 0xFF, 0xFB },       // MPEG-1 Layer 3 frame sync header
+            new byte[] { 0xFF, 0xF3 },       // MPEG-2 Layer 3 frame sync header
+            new byte[] { 0xFF, 0xF2 }
+        } },
         { ".mp4", new List<byte[]> { 
             new byte[] { 0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6D, 0x70, 0x34, 0x32 },
             new byte[] { 0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, 0x6D, 0x70, 0x34, 0x32 },
@@ -28,6 +40,10 @@ public static class FileValidationHelper
             return false;
 
         var ext = Path.GetExtension(fileName).ToLowerInvariant();
+
+        // Plain text files do not have standard binary magic byte signatures and represent zero execution risk
+        if (ext == ".txt" || ext == ".csv" || ext == ".rtf")
+            return true;
 
         if (string.IsNullOrEmpty(ext) || !_fileSignatures.ContainsKey(ext))
             return false;
