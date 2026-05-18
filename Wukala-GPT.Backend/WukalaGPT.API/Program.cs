@@ -79,6 +79,22 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
         options.Events = new JwtBearerEvents
         {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+
+                // If the request is for our hubs...
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    (path.StartsWithSegments("/chathub") || 
+                     path.StartsWithSegments("/casehub") || 
+                     path.StartsWithSegments("/notificationhub")))
+                {
+                    // Read the token out of the query string for WebSocket connections
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            },
             OnTokenValidated = async context =>
             {
                 var cache = context.HttpContext.RequestServices.GetRequiredService<IDistributedCache>();
@@ -131,7 +147,7 @@ else
     app.UseHsts(); // Enforce HTTP Strict Transport Security in Prod
 }
 
-//app.UseHttpsRedirection();
+app.UseWebSockets();
 app.UseCors("StrictProductionPolicy"); // Ensure only whitelisted domains can hit API
 
 // Add UseAuthentication if you have Auth configured

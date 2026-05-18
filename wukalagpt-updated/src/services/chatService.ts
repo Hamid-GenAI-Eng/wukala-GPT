@@ -21,9 +21,7 @@ class ChatService {
     
     this.connection = new signalR.HubConnectionBuilder()
       .withUrl(hubUrl, {
-        accessTokenFactory: () => token,
-        skipNegotiation: true,
-        transport: signalR.HttpTransportType.WebSockets
+        accessTokenFactory: () => token
       })
       .withAutomaticReconnect()
       .configureLogging(signalR.LogLevel.Information)

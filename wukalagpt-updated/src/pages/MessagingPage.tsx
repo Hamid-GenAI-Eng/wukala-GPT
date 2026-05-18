@@ -171,7 +171,10 @@ export default function MessagingPage() {
     const unsubscribe = chatService.onMessageReceived((msg) => {
       // If message is from currently selected user, add to messages
       if (selectedConversation && (msg.senderId === selectedConversation.targetUserId || msg.receiverId === selectedConversation.targetUserId)) {
-        setMessages(prev => [...prev, msg]);
+        setMessages(prev => {
+          if (prev.some(m => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
         scrollToBottom();
       }
       
@@ -388,11 +391,17 @@ export default function MessagingPage() {
     if (!content.trim() || !selectedConversation || !user) return;
     
     try {
+      const sentMsg = await api.sendMessage(selectedConversation.targetUserId, content);
+      
       if (selectedConversation.id.startsWith('temp-')) {
-        throw new Error("Temporary conversation");
-      }
-      const sentMsg = await chatService.sendMessage(selectedConversation.targetUserId, content);
-      if (sentMsg) {
+        const updatedConvs = await api.getConversations();
+        setConversations(updatedConvs);
+        const realConv = updatedConvs.find(c => c.targetUserId === selectedConversation.targetUserId);
+        if (realConv) {
+          setSelectedConversation(realConv);
+          fetchMessages(realConv.id);
+        }
+      } else {
         setMessages(prev => {
           if (prev.some(m => m.id === sentMsg.id)) return prev;
           return [...prev, sentMsg];
@@ -401,26 +410,8 @@ export default function MessagingPage() {
       }
       await fetchConversations();
     } catch (error) {
-      try {
-        const sentMsg = await api.sendMessage(selectedConversation.targetUserId, content);
-        if (selectedConversation.id.startsWith('temp-')) {
-          const updatedConvs = await api.getConversations();
-          setConversations(updatedConvs);
-          const realConv = updatedConvs.find(c => c.targetUserId === selectedConversation.targetUserId);
-          if (realConv) {
-            setSelectedConversation(realConv);
-            fetchMessages(realConv.id);
-          }
-        } else {
-          setMessages(prev => {
-            if (prev.some(m => m.id === sentMsg.id)) return prev;
-            return [...prev, sentMsg];
-          });
-          scrollToBottom();
-        }
-      } catch (httpError) {
-        toast.error("Failed to send message");
-      }
+      console.error("Failed to send message:", error);
+      toast.error("Failed to send message");
     }
   };
 
