@@ -43,27 +43,13 @@ public class MessagesController : ControllerBase
             // to ensure flawless integration regardless of client-side JSON serialization/casing.
             var broadcastPayload = new
             {
-                id = message.Id,
-                messageId = message.Id,
-                MessageId = message.Id,
-
-                senderId = message.SenderId,
+                Id = message.Id,
                 SenderId = message.SenderId,
-
-                receiverId = message.ReceiverId,
                 ReceiverId = message.ReceiverId,
-
-                content = message.Content,
                 Content = message.Content,
-
-                sentAt = message.SentAt,
                 SentAt = message.SentAt,
-                timestamp = message.SentAt,
                 Timestamp = message.SentAt,
-
-                isRead = message.Status == MessageStatus.Read,
                 IsRead = message.Status == MessageStatus.Read,
-                status = message.Status.ToString(),
                 Status = message.Status.ToString()
             };
 
