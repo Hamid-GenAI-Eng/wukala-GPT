@@ -18,6 +18,7 @@ public class LinkCaseCommand : IRequest<bool>
     public Guid RequesterUserId { get; set; }
     public Guid LinkedCaseId { get; set; }
     public string LinkType { get; set; } = "Related";
+    public string? Relationship { get; set; }
 }
 
 public class LinkCaseCommandHandler : IRequestHandler<LinkCaseCommand, bool>
@@ -45,11 +46,26 @@ public class LinkCaseCommandHandler : IRequestHandler<LinkCaseCommand, bool>
 
         if (existingLink != null) throw new Exception("Link already exists.");
 
+        var rawType = (request.Relationship ?? request.LinkType ?? "Related").Trim().ToLowerInvariant();
+        CaseLinkType parsedLinkType;
+        if (rawType.Contains("appeal"))
+        {
+            parsedLinkType = CaseLinkType.Appeal;
+        }
+        else if (rawType.Contains("split"))
+        {
+            parsedLinkType = CaseLinkType.SplitFrom;
+        }
+        else
+        {
+            parsedLinkType = CaseLinkType.Related;
+        }
+
         var link = new CaseLink
         {
             CaseId = request.CaseId,
             LinkedCaseId = request.LinkedCaseId,
-            LinkType = Enum.Parse<CaseLinkType>(request.LinkType, true)
+            LinkType = parsedLinkType
         };
 
         _context.CaseLinks.Add(link);

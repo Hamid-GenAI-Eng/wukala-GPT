@@ -398,6 +398,7 @@ export default function CaseManagement() {
   const [showEditCase, setShowEditCase] = useState(false);
   const [updatingCase, setUpdatingCase] = useState(false);
   const [editCaseData, setEditCaseData] = useState<any>(null);
+  const [cameFromEdit, setCameFromEdit] = useState(false);
 
   // Add event states
   const [showAddEvent, setShowAddEvent] = useState(false);
@@ -630,24 +631,6 @@ export default function CaseManagement() {
     const noteText = newNote;
     try {
       setSavingNote(true);
-      // Optimistic resilient cache update
-      const localNote = {
-        id: 'local_' + Math.random().toString(36).substr(2, 9),
-        author: 'Lead Counsel',
-        date: new Date().toLocaleDateString(),
-        content: noteText
-      };
-      setResilientDetails(prev => {
-        const caseCache = prev[selectedCase.id] || {};
-        return {
-          ...prev,
-          [selectedCase.id]: {
-            ...caseCache,
-            notes: [localNote, ...(caseCache.notes || selectedCase.notes || [])]
-          }
-        };
-      });
-      
       await api.addCaseNote(selectedCase.id, {
         content: noteText,
         isPrivate: false
@@ -658,15 +641,14 @@ export default function CaseManagement() {
         description: "Case note saved successfully."
       });
       await loadCaseDetails(selectedCase.id);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to add internal note", err);
-      // Let it remain cached locally anyway
-      setNewNote('');
+      const errMsg = err?.message || "An unexpected error occurred.";
       toast({
-        title: "Note Saved (Local)",
-        description: "Saved locally due to server details refresh delay."
+        variant: "destructive",
+        title: "Failed to Add Note",
+        description: errMsg
       });
-      await loadCaseDetails(selectedCase.id);
     } finally {
       setSavingNote(false);
     }
@@ -692,41 +674,20 @@ export default function CaseManagement() {
     const titlePrompt = prompt("Enter a title for this document (optional):", file.name) || file.name;
     try {
       setUploadingDoc(true);
-      
-      const localDoc = {
-        id: 'local_' + Math.random().toString(36).substr(2, 9),
-        name: titlePrompt,
-        type: file.type.split('/')[1]?.toUpperCase() || 'PDF',
-        size: (file.size / 1024).toFixed(1) + ' KB',
-        uploadedBy: 'Lawyer',
-        uploadedAt: new Date().toLocaleDateString(),
-        confidential: false
-      };
-      
-      setResilientDetails(prev => {
-        const caseCache = prev[selectedCase.id] || {};
-        return {
-          ...prev,
-          [selectedCase.id]: {
-            ...caseCache,
-            documents: [localDoc, ...(caseCache.documents || selectedCase.documents || [])]
-          }
-        };
-      });
-
       await api.uploadDocument(file, titlePrompt, selectedCase.id);
       toast({
         title: "Document Uploaded",
         description: "Case file successfully saved to records vault."
       });
       await loadCaseDetails(selectedCase.id);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to upload case document", err);
+      const errMsg = err?.message || "An unexpected error occurred.";
       toast({
-        title: "Document Added (Local)",
-        description: "Stored locally. Server failed to refresh details."
+        variant: "destructive",
+        title: "Upload Failed",
+        description: errMsg
       });
-      await loadCaseDetails(selectedCase.id);
     } finally {
       setUploadingDoc(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -740,9 +701,19 @@ export default function CaseManagement() {
         setArchivingCase(true);
         await api.archiveCase(selectedCase.id);
         setSelectedCase(null);
+        toast({
+          title: "Case Archived",
+          description: "Case successfully archived."
+        });
         await loadCasesList();
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to archive case", err);
+        const errMsg = err?.message || "An unexpected error occurred.";
+        toast({
+          variant: "destructive",
+          title: "Failed to Archive Case",
+          description: errMsg
+        });
       } finally {
         setArchivingCase(false);
       }
@@ -794,12 +765,30 @@ export default function CaseManagement() {
       
       await api.updateCase(editCaseData.id, payload);
       setShowEditCase(false);
+      toast({
+        title: "Case Updated",
+        description: "Case details saved successfully."
+      });
       await loadCaseDetails(editCaseData.id);
       await loadCasesList();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to update case details", err);
+      const errMsg = err?.message || "An unexpected error occurred.";
+      toast({
+        variant: "destructive",
+        title: "Failed to Update Case",
+        description: errMsg
+      });
     } finally {
       setUpdatingCase(false);
+    }
+  };
+
+  const handleAddEventOpenChange = (open: boolean) => {
+    setShowAddEvent(open);
+    if (!open && cameFromEdit) {
+      setCameFromEdit(false);
+      setShowEditCase(true);
     }
   };
 
@@ -807,24 +796,10 @@ export default function CaseManagement() {
     if (!selectedCase) return;
     try {
       setAddingEvent(true);
-      const localEvent = {
-        id: 'local_' + Math.random().toString(36).substr(2, 9),
-        date: safeDateString(newEventData.eventDate),
-        title: newEventData.title,
-        description: newEventData.description,
-        type: newEventData.eventType.toLowerCase()
-      };
-      
-      setResilientDetails(prev => {
-        const caseCache = prev[selectedCase.id] || {};
-        return {
-          ...prev,
-          [selectedCase.id]: {
-            ...caseCache,
-            timeline: [localEvent, ...(caseCache.timeline || selectedCase.timeline || [])]
-          }
-        };
-      });
+
+      const isFromEdit = cameFromEdit;
+      const finalEventDate = newEventData.eventDate;
+      const finalEventType = newEventData.eventType;
 
       await api.addCaseTimelineEvent(selectedCase.id, {
         eventType: newEventData.eventType.toLowerCase(),
@@ -845,22 +820,25 @@ export default function CaseManagement() {
         eventDate: new Date().toISOString().split('T')[0],
         attachmentId: ''
       });
+      if (isFromEdit) {
+        if (editCaseData) {
+          setEditCaseData(prev => ({
+            ...prev,
+            nextDate: finalEventType.toLowerCase() === 'hearing' ? finalEventDate : prev.nextDate
+          }));
+        }
+        setCameFromEdit(false);
+        setShowEditCase(true);
+      }
       await loadCaseDetails(selectedCase.id);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to add event", err);
+      const errMsg = err?.message || "An unexpected error occurred.";
       toast({
-        title: "Event Added (Local)",
-        description: "Stored locally. Server failed to refresh timeline."
+        variant: "destructive",
+        title: "Failed to Add Event",
+        description: errMsg
       });
-      setShowAddEvent(false);
-      setNewEventData({
-        eventType: 'Hearing',
-        title: '',
-        description: '',
-        eventDate: new Date().toISOString().split('T')[0],
-        attachmentId: ''
-      });
-      await loadCaseDetails(selectedCase.id);
     } finally {
       setAddingEvent(false);
     }
@@ -871,18 +849,6 @@ export default function CaseManagement() {
     const targetId = linkTargetId;
     try {
       setLinkingCase(true);
-      
-      setResilientDetails(prev => {
-        const caseCache = prev[selectedCase.id] || {};
-        return {
-          ...prev,
-          [selectedCase.id]: {
-            ...caseCache,
-            linkedCases: Array.from(new Set([targetId, ...(caseCache.linkedCases || selectedCase.linkedCases || [])]))
-          }
-        };
-      });
-
       await api.linkCase(selectedCase.id, {
         linkedCaseId: targetId,
         relationship: linkRelationship,
@@ -897,17 +863,14 @@ export default function CaseManagement() {
       setLinkTargetId('');
       setLinkNote('');
       await loadCaseDetails(selectedCase.id);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to link cases", err);
+      const errMsg = err?.message || "An unexpected error occurred.";
       toast({
-        title: "Cases Linked (Local)",
-        description: "Linked locally. Server failed to refresh records."
+        variant: "destructive",
+        title: "Failed to Link Cases",
+        description: errMsg
       });
-      setShowLinkCase(false);
-      setLinkSearch('');
-      setLinkTargetId('');
-      setLinkNote('');
-      await loadCaseDetails(selectedCase.id);
     } finally {
       setLinkingCase(false);
     }
@@ -944,15 +907,13 @@ export default function CaseManagement() {
 
       await loadCaseDetails(selectedCase.id);
       await loadCasesList();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to transition status", err);
-      setSelectedCase(prev => {
-        if (!prev) return null;
-        return { ...prev, status: targetStatus };
-      });
+      const errMsg = err?.message || "An unexpected error occurred.";
       toast({
-        title: "Transition Updated",
-        description: `Case updated locally to "${targetStatus}"`
+        variant: "destructive",
+        title: "Transition Failed",
+        description: errMsg
       });
     }
   };
@@ -988,13 +949,14 @@ export default function CaseManagement() {
   }
 
   // ─── Case Detail View ──────────────────────────────────────────
-  if (selectedCase) {
-    const currentStageIndex = pipelineStages.findIndex(
-      s => s.status === selectedCase.status
-    );
+  const currentStageIndex = selectedCase
+    ? pipelineStages.findIndex(s => s.status === selectedCase.status)
+    : -1;
 
-    return (
-      <motion.div
+  return (
+    <div className="space-y-5">
+      {selectedCase ? (
+        <motion.div
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -20 }}
@@ -1317,13 +1279,9 @@ export default function CaseManagement() {
             )}
           </motion.div>
         </AnimatePresence>
-      </motion.div>
-    );
-  }
-
-  // ─── Case List View ────────────────────────────────────────────
-  return (
-    <div className="space-y-5">
+        </motion.div>
+      ) : (
+        <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -1527,6 +1485,8 @@ export default function CaseManagement() {
           ))
         )}
       </div>
+      </div>
+      )}
 
       {/* New Case Dialog */}
       <Dialog open={showNewCase} onOpenChange={setShowNewCase}>
@@ -1776,6 +1736,7 @@ export default function CaseManagement() {
                       type="button"
                       onClick={() => {
                         setShowEditCase(false);
+                        setCameFromEdit(true);
                         setNewEventData({
                           eventType: 'Hearing',
                           title: 'Next hearing scheduled',
@@ -1814,7 +1775,7 @@ export default function CaseManagement() {
       </Dialog>
 
       {/* Add Event Dialog */}
-      <Dialog open={showAddEvent} onOpenChange={setShowAddEvent}>
+      <Dialog open={showAddEvent} onOpenChange={handleAddEventOpenChange}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base font-sans">Add Key Case Event</DialogTitle>
@@ -1866,7 +1827,7 @@ export default function CaseManagement() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" size="sm" className="font-sans text-xs" onClick={() => setShowAddEvent(false)}>
+            <Button variant="outline" size="sm" className="font-sans text-xs" onClick={() => handleAddEventOpenChange(false)}>
               Cancel
             </Button>
             <Button size="sm" className="bg-gradient-primary font-sans text-xs gap-1.5" onClick={handleAddEvent} disabled={addingEvent || !newEventData.title}>

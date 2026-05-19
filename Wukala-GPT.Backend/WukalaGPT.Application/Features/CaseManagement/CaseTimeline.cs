@@ -37,19 +37,36 @@ public class AddTimelineEventCommandHandler : IRequestHandler<AddTimelineEventCo
 
     public async Task<CaseTimelineEventDto> Handle(AddTimelineEventCommand request, CancellationToken cancellationToken)
     {
-        var caseExists = await _context.LegalCases.AnyAsync(c => c.Id == request.CaseId && !c.IsArchived, cancellationToken);
-        if (!caseExists) throw new Exception("Case not found.");
+        var legalCase = await _context.LegalCases.FirstOrDefaultAsync(c => c.Id == request.CaseId, cancellationToken);
+        if (legalCase == null || legalCase.IsArchived) throw new Exception("Case not found.");
+
+        var rawEventType = request.EventType?.Trim() ?? string.Empty;
+        if (rawEventType.Equals("filing", StringComparison.OrdinalIgnoreCase))
+        {
+            rawEventType = "Filed";
+        }
+
+        if (!Enum.TryParse<CaseEventType>(rawEventType, true, out var parsedEventType))
+        {
+            throw new ArgumentException($"Invalid EventType: '{request.EventType}'. Supported types are: {string.Join(", ", Enum.GetNames<CaseEventType>())}");
+        }
 
         var newEvent = new CaseTimelineEvent
         {
             CaseId = request.CaseId,
             CreatedById = request.RequesterUserId,
-            EventType = Enum.Parse<CaseEventType>(request.EventType, true),
+            EventType = parsedEventType,
             Title = request.Title,
             Description = request.Description,
             EventDate = request.EventDate,
             CreatedAt = DateTime.UtcNow
         };
+
+        if (newEvent.EventType == CaseEventType.Hearing)
+        {
+            legalCase.NextDate = DateOnly.FromDateTime(request.EventDate);
+            legalCase.UpdatedAt = DateTime.UtcNow;
+        }
 
         _context.CaseTimelineEvents.Add(newEvent);
         await _context.SaveChangesAsync(cancellationToken);
