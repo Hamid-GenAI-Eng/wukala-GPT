@@ -293,8 +293,8 @@ const LawyerProfilePage = () => {
       setExpForm({
         role: exp.role || '',
         firmCompany: exp.firmCompany || '',
-        startDate: exp.startDate ? new Date(exp.startDate).toISOString().split('T')[0] : '',
-        endDate: exp.endDate ? new Date(exp.endDate).toISOString().split('T')[0] : '',
+        startDate: (() => { try { return exp.startDate ? new Date(exp.startDate).toISOString().split('T')[0] : ''; } catch { return ''; } })(),
+        endDate: (() => { try { return exp.endDate ? new Date(exp.endDate).toISOString().split('T')[0] : ''; } catch { return ''; } })(),
         isCurrent: exp.isCurrent || false,
         shortBio: exp.shortBio || '',
         proofUrl: exp.proofUrl || ''
