@@ -93,7 +93,7 @@ public class GetCaseDetailsQueryHandler : IRequestHandler<GetCaseDetailsQuery, C
         var caseEntity = await _context.LegalCases
             .AsNoTracking()
             .Include(c => c.TimelineEvents)
-            .Include(c => c.Notes.Where(n => !n.IsPrivate || n.AuthorId == request.RequesterUserId || c.LeadLawyerId == request.RequesterUserId))
+            .Include(c => c.Notes) // Fetch all notes, filter securely in-memory below to avoid EF Core translation failure
             .Include(c => c.Assignments)
             .Include(c => c.Deadlines)
             .Include(c => c.SourceLinks)
@@ -143,15 +143,18 @@ public class GetCaseDetailsQueryHandler : IRequestHandler<GetCaseDetailsQuery, C
                 CreatedAt = t.CreatedAt
             }).ToList(),
             
-            Notes = caseEntity.Notes.OrderByDescending(n => n.CreatedAt).Select(n => new CaseNoteDto
-            {
-                Id = n.Id,
-                AuthorId = n.AuthorId,
-                Content = n.Content,
-                IsPrivate = n.IsPrivate,
-                CreatedAt = n.CreatedAt,
-                UpdatedAt = n.UpdatedAt
-            }).ToList(),
+            Notes = caseEntity.Notes
+                .Where(n => !n.IsPrivate || n.AuthorId == request.RequesterUserId || caseEntity.LeadLawyerId == request.RequesterUserId)
+                .OrderByDescending(n => n.CreatedAt)
+                .Select(n => new CaseNoteDto
+                {
+                    Id = n.Id,
+                    AuthorId = n.AuthorId,
+                    Content = n.Content,
+                    IsPrivate = n.IsPrivate,
+                    CreatedAt = n.CreatedAt,
+                    UpdatedAt = n.UpdatedAt
+                }).ToList(),
 
             Assignments = caseEntity.Assignments.Select(a => new CaseAssignmentDto
             {

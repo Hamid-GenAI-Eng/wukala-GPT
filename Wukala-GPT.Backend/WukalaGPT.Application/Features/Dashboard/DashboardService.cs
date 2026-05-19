@@ -39,51 +39,77 @@ public class DashboardService : IDashboardService
             .SumAsync(p => p.Amount);
 
         // 2. Urgent Items (Notifications with High/Critical priority + Deadlines)
-        var urgentNotifications = await _context.AppNotifications
+        var urgentNotificationsRaw = await _context.AppNotifications.AsNoTracking()
             .Where(n => n.UserId == lawyerId && !n.IsRead && (n.Priority == "critical" || n.Priority == "high"))
             .OrderByDescending(n => n.CreatedAt)
             .Take(5)
-            .Select(n => new UrgentItemDto
+            .Select(n => new
             {
-                Id = n.Id,
-                Title = n.Title,
-                Description = n.Description,
-                Priority = n.Priority,
-                Deadline = GetTimeAgo(n.CreatedAt),
-                Type = n.Type
+                n.Id,
+                n.Title,
+                n.Description,
+                n.Priority,
+                n.CreatedAt,
+                n.Type
             })
             .ToListAsync();
 
+        var urgentNotifications = urgentNotificationsRaw.Select(n => new UrgentItemDto
+        {
+            Id = n.Id,
+            Title = n.Title,
+            Description = n.Description,
+            Priority = n.Priority,
+            Deadline = GetTimeAgo(n.CreatedAt),
+            Type = n.Type
+        }).ToList();
+
         // 3. Recent Cases
-        var recentCases = await _context.LegalCases.AsNoTracking()
+        var recentCasesRaw = await _context.LegalCases.AsNoTracking()
             .Include(c => c.Client)
             .Where(c => c.LeadLawyerId == lawyerId)
             .OrderByDescending(c => c.CreatedAt)
             .Take(5)
-            .Select(c => new RecentCaseDto
+            .Select(c => new
             {
-                Id = c.Id,
-                Title = c.Title,
-                Client = c.Client != null ? c.Client.FullName : "Unknown Client",
-                Status = c.Status.ToString(),
-                LastUpdate = "Recently added"
+                c.Id,
+                c.Title,
+                ClientName = c.Client != null ? c.Client.FullName : "Unknown Client",
+                c.Status
             })
             .ToListAsync();
 
+        var recentCases = recentCasesRaw.Select(c => new RecentCaseDto
+        {
+            Id = c.Id,
+            Title = c.Title,
+            Client = c.ClientName,
+            Status = c.Status.ToString(),
+            LastUpdate = "Recently added"
+        }).ToList();
+
         // 4. Upcoming Hearings
-        var upcomingHearings = await _context.Hearings.AsNoTracking()
+        var upcomingHearingsRaw = await _context.Hearings.AsNoTracking()
             .Where(h => h.LeadLawyerId == lawyerId && h.HearingDate >= dateNow && h.Status == "Scheduled")
             .OrderBy(h => h.HearingDate)
             .Take(5)
-            .Select(h => new UpcomingHearingDto
+            .Select(h => new
             {
-                Id = h.Id,
-                CaseTitle = "Case Hearing", // Ideally join with Case title if exists
-                Court = h.CourtName ?? "Local Court",
-                Date = h.HearingDate.ToDateTime(TimeOnly.MinValue),
-                Time = h.StartTime.ToString("hh:mm tt")
-             })
+                h.Id,
+                Court = h.CourtName,
+                h.HearingDate,
+                h.StartTime
+            })
             .ToListAsync();
+
+        var upcomingHearings = upcomingHearingsRaw.Select(h => new UpcomingHearingDto
+        {
+            Id = h.Id,
+            CaseTitle = "Case Hearing", // Ideally join with Case title if exists
+            Court = h.Court ?? "Local Court",
+            Date = h.HearingDate.ToDateTime(TimeOnly.MinValue),
+            Time = h.StartTime.ToString("hh:mm tt")
+         }).ToList();
 
         // 5. Case Distribution (Mocked logic based on status for now)
         var distribution = new List<CaseCategoryDistributionDto>
