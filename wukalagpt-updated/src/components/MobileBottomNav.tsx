@@ -42,6 +42,8 @@ export default function MobileBottomNav() {
   const location = useLocation();
   const { user, isAuthenticated } = useAuth();
 
+  if (user?.role === 'lawyer') return null;
+
   const getNavigation = () => {
     if (!isAuthenticated) return publicNav;
     if (user?.role === 'lawyer') return lawyerNav;

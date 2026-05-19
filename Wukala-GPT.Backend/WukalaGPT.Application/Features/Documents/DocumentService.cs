@@ -50,7 +50,8 @@ public class DocumentService : IDocumentService
             MimeType = file.ContentType,
             SizeInBytes = file.Length,
             Classification = classification,
-            UploadedAt = DateTime.UtcNow
+            UploadedAt = DateTime.UtcNow,
+            LegalCaseId = dto.LegalCaseId
         };
 
         _context.LegalDocuments.Add(document);

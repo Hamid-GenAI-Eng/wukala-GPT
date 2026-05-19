@@ -78,12 +78,7 @@ const clientNavigation = [
   { name: 'Find Lawyers', href: '/lawyers', icon: Users },
 ];
 
-const lawyerNavigation = [
-  { name: 'Dashboard', href: '/lawyer-dashboard', icon: LayoutDashboard },
-  { name: 'AI Assistant', href: '/chat', icon: MessageSquare },
-  { name: 'Messages', href: '/messages', icon: MessageSquare },
-  { name: 'Documents', href: '/documents', icon: FileText },
-];
+const lawyerNavigation: { name: string; href: string; icon: any }[] = [];
 
 const adminNavigation = [
   { name: 'Console', href: '/admin', icon: LayoutDashboard },
@@ -405,7 +400,7 @@ export default function Layout({ children }: LayoutProps) {
         <div className="container flex h-14 lg:h-16 items-center justify-between px-4">
           <div className="absolute inset-0 -z-10 opacity-70 bg-[radial-gradient(circle_at_10%_20%,rgba(251,191,36,0.08),transparent_35%),radial-gradient(circle_at_90%_10%,rgba(59,130,246,0.09),transparent_32%)]" aria-hidden />
           {/* Logo */}
-          <Link to={(user?.role || '').toLowerCase() === 'admin' ? '/admin' : '/'} className="group flex items-center space-x-2 lg:space-x-3 [perspective:1200px]">
+          <Link to={(user?.role || '').toLowerCase() === 'admin' ? '/admin' : (user?.role || '').toLowerCase() === 'lawyer' ? '/lawyer-dashboard' : '/'} className="group flex items-center space-x-2 lg:space-x-3 [perspective:1200px]">
             <span className="relative inline-flex items-center justify-center rounded-full p-[2px] ring-2 ring-amber-400 ring-offset-2 ring-offset-background shadow-[0_0_12px_rgba(251,191,36,0.25)] transition-all duration-500 group-hover:ring-amber-300 group-hover:shadow-[0_0_18px_rgba(251,191,36,0.4)]">
               <img 
                 src={logo} 
@@ -500,12 +495,20 @@ export default function Layout({ children }: LayoutProps) {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     {(user?.role || '').toLowerCase() === 'lawyer' && (
-                      <DropdownMenuItem asChild>
-                        <Link to="/lawyer-profile" className="cursor-pointer">
-                          <User className="mr-2 h-4 w-4" />
-                          My Profile
-                        </Link>
-                      </DropdownMenuItem>
+                      <>
+                        <DropdownMenuItem asChild>
+                          <Link to="/lawyer-dashboard" className="cursor-pointer">
+                            <LayoutDashboard className="mr-2 h-4 w-4" />
+                            Lawyer Dashboard
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/lawyer-profile" className="cursor-pointer">
+                            <User className="mr-2 h-4 w-4" />
+                            My Profile
+                          </Link>
+                        </DropdownMenuItem>
+                      </>
                     )}
                     {(user?.role || '').toLowerCase() === 'client' && (
                       <DropdownMenuItem asChild>
@@ -614,18 +617,32 @@ export default function Layout({ children }: LayoutProps) {
                 {/* Profile Button - Separate section */}
                 <div className="pt-2 mt-1 border-t border-border/60">
                   {user?.role === 'lawyer' && (
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="w-full justify-start mb-1 h-8 text-xs px-2"
-                      onClick={() => setIsMobileMenuOpen(false)}
-                    >
-                      <Link to="/lawyer-profile">
-                        <User className="h-3.5 w-3.5 mr-1.5" />
-                        My Profile
-                      </Link>
-                    </Button>
+                    <>
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-start mb-1 h-8 text-xs px-2"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <Link to="/lawyer-dashboard">
+                          <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" />
+                          Dashboard
+                        </Link>
+                      </Button>
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="w-full justify-start mb-1 h-8 text-xs px-2"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                      >
+                        <Link to="/lawyer-profile">
+                          <User className="h-3.5 w-3.5 mr-1.5" />
+                          My Profile
+                        </Link>
+                      </Button>
+                    </>
                   )}
                   {user?.role === 'client' && (
                     <Button

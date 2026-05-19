@@ -77,6 +77,13 @@ const folders: VaultFolder[] = [
   { id: 'identity', name: 'Client Documents', files: 22, size: '98 MB', icon: Users, color: 'text-primary-muted', subfolders: ['CNICs', 'Power of Attorney', 'Contracts'] },
 ];
 
+const personalFolders: VaultFolder[] = [
+  { id: 'credentials', name: 'Degrees & Licenses', files: 4, size: '12 MB', icon: Shield, color: 'text-primary', subfolders: ['Licenses', 'Degrees', 'Certifications'] },
+  { id: 'templates', name: 'Firm Templates', files: 12, size: '45 MB', icon: FileText, color: 'text-success', subfolders: ['Power of Attorney', 'Retainers', 'Agreements'] },
+  { id: 'bio', name: 'Bio & Credentials', files: 6, size: '8 MB', icon: FolderOpen, color: 'text-gold', subfolders: ['Bio Drafts', 'Photos', 'Press'] },
+  { id: 'research', name: 'Personal Research', files: 9, size: '28 MB', icon: File, color: 'text-destructive', subfolders: ['Opinions', 'Pleading Notes', 'Case Logs'] },
+];
+
 const vaultFiles: VaultFile[] = [
   { id: 1, name: 'Wakalatnama - Khan Industries.pdf', folder: 'Pleadings', client: 'Khan Industries Pvt Ltd', caseRef: 'Civil Suit #1247', size: '245 KB', modified: '2 hours ago', type: 'PDF', confidential: true, ocrIndexed: true, versions: 3, sharedWith: [] },
   { id: 2, name: 'Evidence Bundle - State v. Ali Raza.zip', folder: 'Evidence', client: 'Ali Raza', caseRef: 'Criminal Case #892', size: '48 MB', modified: '5 hours ago', type: 'ZIP', confidential: true, ocrIndexed: false, versions: 1, sharedWith: [] },
@@ -86,6 +93,16 @@ const vaultFiles: VaultFile[] = [
   { id: 6, name: 'Court Order - Civil Suit #2847.pdf', folder: 'Court Orders', client: 'Islamabad Developers', caseRef: 'Civil Suit #2847', size: '1.1 MB', modified: '4 days ago', type: 'PDF', confidential: false, ocrIndexed: true, versions: 1, sharedWith: ['client', 'opponent'] },
   { id: 7, name: 'CNIC - Fatima Bibi.jpg', folder: 'Client Documents', client: 'Fatima Bibi', caseRef: 'Family Suit #331', size: '420 KB', modified: '5 days ago', type: 'IMG', confidential: true, ocrIndexed: true, versions: 1, sharedWith: [] },
   { id: 8, name: 'Written Statement - Ahmed Real Estate.pdf', folder: 'Pleadings', client: 'Ahmed Real Estate Group', caseRef: 'Civil Suit #1893', size: '2.8 MB', modified: '1 week ago', type: 'PDF', confidential: false, ocrIndexed: true, versions: 4, sharedWith: [] },
+];
+
+const personalFiles: VaultFile[] = [
+  { id: 101, name: 'High_Court_Advocate_License.pdf', folder: 'Degrees & Licenses', client: 'Personal Document', caseRef: 'License ID #44921', size: '2.4 MB', modified: '1 month ago', type: 'PDF', confidential: true, ocrIndexed: true, versions: 1, sharedWith: [] },
+  { id: 102, name: 'LLB_Degree_Punjab_University.pdf', folder: 'Degrees & Licenses', client: 'Personal Document', caseRef: 'Education Registry', size: '3.8 MB', modified: '2 years ago', type: 'PDF', confidential: true, ocrIndexed: true, versions: 1, sharedWith: [] },
+  { id: 103, name: 'WukalaGPT_Specialization_Proof.pdf', folder: 'Degrees & Licenses', client: 'Personal Document', caseRef: 'Certifications', size: '1.2 MB', modified: '3 days ago', type: 'PDF', confidential: false, ocrIndexed: true, versions: 2, sharedWith: [] },
+  { id: 104, name: 'Standard_Retainer_Agreement_Firm.docx', folder: 'Firm Templates', client: 'Personal Document', caseRef: 'Templates v2', size: '920 KB', modified: '2 weeks ago', type: 'DOCX', confidential: false, ocrIndexed: true, versions: 4, sharedWith: [] },
+  { id: 105, name: 'Wakalatnama_Master_Template.docx', folder: 'Firm Templates', client: 'Personal Document', caseRef: 'Templates v2', size: '480 KB', modified: '5 days ago', type: 'DOCX', confidential: false, ocrIndexed: true, versions: 3, sharedWith: [] },
+  { id: 106, name: 'Professional_Bio_Summary_SaraMalik.docx', folder: 'Bio & Credentials', client: 'Personal Document', caseRef: 'Bio Media Kit', size: '150 KB', modified: 'Yesterday', type: 'DOCX', confidential: false, ocrIndexed: false, versions: 5, sharedWith: [] },
+  { id: 107, name: 'Legal_Opinion_Corporate_Taxation.pdf', folder: 'Personal Research', client: 'Personal Document', caseRef: 'Research Notes', size: '1.4 MB', modified: '1 week ago', type: 'PDF', confidential: true, ocrIndexed: true, versions: 1, sharedWith: [] },
 ];
 
 const versionHistory = [
@@ -122,8 +139,12 @@ export default function DocumentVault() {
   const [selectedFile, setSelectedFile] = useState<VaultFile | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'browse' | 'search' | 'storage'>('browse');
+  const [vaultType, setVaultType] = useState<'client' | 'personal'>('client');
 
-  const filteredFiles = vaultFiles.filter(f => {
+  const activeFolders = vaultType === 'client' ? folders : personalFolders;
+  const activeFilesList = vaultType === 'client' ? vaultFiles : personalFiles;
+
+  const filteredFiles = activeFilesList.filter(f => {
     const matchesSearch = !searchQuery || f.name.toLowerCase().includes(searchQuery.toLowerCase()) || f.client.toLowerCase().includes(searchQuery.toLowerCase()) || f.caseRef.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFolder = !selectedFolder || f.folder === selectedFolder.name;
     return matchesSearch && matchesFolder;
@@ -177,6 +198,30 @@ export default function DocumentVault() {
         </TabsList>
       </Tabs>
 
+      {/* Vault Type Selector */}
+      <div className="flex bg-secondary/50 rounded-lg p-1 max-w-md w-full border border-border/40">
+        <button
+          onClick={() => { setVaultType('client'); setCurrentView('folders'); setSelectedFolder(null); }}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold font-sans rounded-md transition-all ${
+            vaultType === 'client'
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Users className="h-3.5 w-3.5" /> Client Documents
+        </button>
+        <button
+          onClick={() => { setVaultType('personal'); setCurrentView('folders'); setSelectedFolder(null); }}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold font-sans rounded-md transition-all ${
+            vaultType === 'personal'
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Shield className="h-3.5 w-3.5" /> My Personal Vault
+        </button>
+      </div>
+
       <AnimatePresence mode="wait">
         {/* ═══ BROWSE TAB ═══ */}
         {activeTab === 'browse' && (
@@ -192,10 +237,10 @@ export default function DocumentVault() {
                   <div className="h-full bg-primary rounded-full transition-all" style={{ width: '42%' }} />
                 </div>
                 <div className="flex items-center gap-4 mt-2 text-[10px] font-sans text-muted-foreground">
-                  <span>{vaultFiles.length} files</span>
-                  <span>{folders.length} folders</span>
-                  <span>{vaultFiles.filter(f => f.confidential).length} confidential</span>
-                  <span>{vaultFiles.filter(f => f.ocrIndexed).length} OCR indexed</span>
+                  <span>{activeFilesList.length} files</span>
+                  <span>{activeFolders.length} folders</span>
+                  <span>{activeFilesList.filter(f => f.confidential).length} confidential</span>
+                  <span>{activeFilesList.filter(f => f.ocrIndexed).length} OCR indexed</span>
                 </div>
               </CardContent>
             </Card>
@@ -204,9 +249,11 @@ export default function DocumentVault() {
               {/* Folder Grid */}
               {currentView === 'folders' && (
                 <motion.div key="folders" {...fadeIn}>
-                  <h3 className="text-sm font-semibold font-sans text-foreground mb-3">Folders — Client → Case → Document Type</h3>
-                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                    {folders.map(f => (
+                  <h3 className="text-sm font-semibold font-sans text-foreground mb-3">
+                    {vaultType === 'client' ? "Folders — Client → Case → Document Type" : "Folders — Personal Credentials & Practice Templates"}
+                  </h3>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    {activeFolders.map(f => (
                       <Card key={f.id} className="border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group" onClick={() => openFolder(f)}>
                         <CardContent className="p-4">
                           <div className={`h-10 w-10 rounded-lg bg-secondary flex items-center justify-center mb-3 ${f.color} group-hover:scale-105 transition-transform`}>

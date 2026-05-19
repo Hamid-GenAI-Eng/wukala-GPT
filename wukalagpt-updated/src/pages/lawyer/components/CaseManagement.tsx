@@ -57,7 +57,7 @@ import {
   GitBranch,
   Loader2,
 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '@/services/api';
 
 // ─── Data Types ─────────────────────────────────────────────────────
@@ -363,11 +363,80 @@ export default function CaseManagement() {
   const [caseList, setCaseList] = useState<CaseFile[]>([]);
   const [addingCase, setAddingCase] = useState(false);
   
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [savingNote, setSavingNote] = useState(false);
+  const [clients, setClients] = useState<any[]>([]);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [archivingCase, setArchivingCase] = useState(false);
+  
+  // Edit case states
+  const [showEditCase, setShowEditCase] = useState(false);
+  const [updatingCase, setUpdatingCase] = useState(false);
+  const [editCaseData, setEditCaseData] = useState<any>(null);
+
+  // Add event states
+  const [showAddEvent, setShowAddEvent] = useState(false);
+  const [addingEvent, setAddingEvent] = useState(false);
+  const [newEventData, setNewEventData] = useState({
+    eventType: 'Hearing',
+    title: '',
+    description: '',
+    eventDate: new Date().toISOString().split('T')[0]
+  });
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Mapper function to normalize case properties securely
+  function normalizeCase(c: any): CaseFile {
+    return {
+      id: c.id,
+      title: c.title || '',
+      caseNumber: c.caseNumber || '',
+      firNumber: c.firNumber || '',
+      client: c.clientNameRaw || c.client || '',
+      clientId: c.clientId || null,
+      court: c.courtName || c.court || '',
+      judge: c.judgeName || c.judge || '',
+      opposingCounsel: c.opposingCounsel || '',
+      type: c.caseType || c.type || '',
+      priority: c.priority || 'Medium',
+      status: c.status || 'Active',
+      stage: c.stage || 'Initial filing',
+      nextHearing: c.nextHearing || c.nextDate ? new Date(c.nextHearing || c.nextDate).toISOString().split('T')[0] : '',
+      filedDate: c.filedDate || c.filingDate ? new Date(c.filedDate || c.filingDate).toISOString().split('T')[0] : '',
+      description: c.description || '',
+      linkedCases: Array.isArray(c.linkedCases) ? c.linkedCases.map((l: any) => l.linkedCaseId || l) : [],
+      timeline: Array.isArray(c.timeline) ? c.timeline.map((t: any) => ({
+        id: t.id,
+        date: t.eventDate ? new Date(t.eventDate).toISOString().split('T')[0] : new Date(t.createdAt).toISOString().split('T')[0],
+        title: t.title || '',
+        description: t.description || '',
+        type: (t.eventType || 'Hearing').toLowerCase()
+      })) : [],
+      notes: Array.isArray(c.notes) ? c.notes.map((n: any) => ({
+        id: n.id,
+        author: n.authorId === c.leadLawyerId ? 'Lead Counsel' : 'Internal User',
+        date: n.createdAt ? new Date(n.createdAt).toLocaleDateString() : 'Just now',
+        content: n.content || ''
+      })) : [],
+      documents: Array.isArray(c.documents) ? c.documents.map((d: any) => ({
+        id: d.id,
+        name: d.name || d.fileName || 'Untitled Document',
+        type: d.classification || d.mimeType || 'PDF',
+        size: d.sizeFormatted || 'Unknown size',
+        uploadedBy: 'Lawyer',
+        uploadedAt: d.uploadedAt ? new Date(d.uploadedAt).toLocaleDateString() : 'Just now',
+        confidential: false
+      })) : []
+    };
+  }
+
   const [newCaseData, setNewCaseData] = useState({
     title: '',
     caseNumber: '',
     firNumber: '',
     client: '',
+    clientId: '',
     court: '',
     judge: '',
     opposingCounsel: '',
@@ -380,36 +449,85 @@ export default function CaseManagement() {
     description: ''
   });
 
+  const loadCaseDetails = async (caseId: string) => {
+    try {
+      setLoadingDetails(true);
+      const res = await api.getCase(caseId);
+      if (res) {
+        setSelectedCase(normalizeCase(res));
+      }
+    } catch (err) {
+      console.error("Failed to load secure case details", err);
+      // Fallback
+      const local = caseList.find(c => c.id === caseId);
+      if (local) {
+        setSelectedCase(local);
+      }
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
+  const loadCasesList = async () => {
+    try {
+      setLoading(true);
+      const res = await api.getCases();
+      const casesArray = Array.isArray(res) ? res : (res?.items || res?.Items || []);
+      if (casesArray && casesArray.length > 0) {
+        setCaseList(casesArray.map(normalizeCase));
+      } else {
+        setCaseList(cases.map(normalizeCase));
+      }
+    } catch (err) {
+      console.error("Failed to load secure cases directory", err);
+      setCaseList(cases.map(normalizeCase));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    async function loadCases() {
+    loadCasesList();
+    
+    // Load clients
+    async function loadClients() {
       try {
-        setLoading(true);
-        const res = await api.getCases();
-        if (res && res.length > 0) {
-          setCaseList(res);
-        } else {
-          setCaseList(cases);
-        }
+        const res = await api.getClients();
+        const clientList = Array.isArray(res) ? res : (res?.items || res?.Items || []);
+        setClients(clientList);
       } catch (err) {
-        console.error("Failed to load secure cases directory. Falling back to offline client view", err);
-        setCaseList(cases);
-      } finally {
-        setLoading(false);
+        console.error("Failed to load clients dropdown", err);
       }
     }
-    loadCases();
+    loadClients();
   }, []);
 
   const handleAddCase = async () => {
     try {
       setAddingCase(true);
-      await api.createCase(newCaseData);
+      const payload = {
+        title: newCaseData.title,
+        caseNumber: newCaseData.caseNumber,
+        firNumber: newCaseData.firNumber,
+        clientNameRaw: newCaseData.client,
+        clientId: newCaseData.clientId || null,
+        courtName: newCaseData.court,
+        judgeName: newCaseData.judge,
+        opposingCounsel: newCaseData.opposingCounsel,
+        caseType: newCaseData.type || 'Civil',
+        priority: newCaseData.priority || 'Normal',
+        filingDate: newCaseData.filedDate ? new Date(newCaseData.filedDate).toISOString() : new Date().toISOString(),
+        description: newCaseData.description
+      };
+      
+      await api.createCase(payload);
       setShowNewCase(false);
       setNewCaseData({
         title: '',
         caseNumber: '',
         firNumber: '',
         client: '',
+        clientId: '',
         court: '',
         judge: '',
         opposingCounsel: '',
@@ -421,14 +539,153 @@ export default function CaseManagement() {
         filedDate: new Date().toISOString().split('T')[0],
         description: ''
       });
-      const updated = await api.getCases();
-      if (updated && updated.length > 0) {
-        setCaseList(updated);
-      }
+      await loadCasesList();
     } catch (err) {
       console.error("Failed to create case", err);
     } finally {
       setAddingCase(false);
+    }
+  };
+
+  const handleAddNote = async () => {
+    if (!newNote.trim() || !selectedCase) return;
+    try {
+      setSavingNote(true);
+      await api.addCaseNote(selectedCase.id, {
+        content: newNote,
+        isPrivate: false
+      });
+      setNewNote('');
+      await loadCaseDetails(selectedCase.id);
+    } catch (err) {
+      console.error("Failed to add internal note", err);
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    if (!selectedCase) return;
+    try {
+      await api.deleteCaseNote(selectedCase.id, noteId);
+      await loadCaseDetails(selectedCase.id);
+    } catch (err) {
+      console.error("Failed to delete note", err);
+    }
+  };
+
+  const handleUploadDocumentClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedCase) return;
+    try {
+      setUploadingDoc(true);
+      const titlePrompt = prompt("Enter a title for this document (optional):", file.name);
+      await api.uploadDocument(file, titlePrompt || file.name, selectedCase.id);
+      await loadCaseDetails(selectedCase.id);
+    } catch (err) {
+      console.error("Failed to upload case document", err);
+    } finally {
+      setUploadingDoc(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleArchiveCase = async () => {
+    if (!selectedCase) return;
+    if (confirm("Are you sure you want to archive this case? It will be removed from active listings.")) {
+      try {
+        setArchivingCase(true);
+        await api.archiveCase(selectedCase.id);
+        setSelectedCase(null);
+        await loadCasesList();
+      } catch (err) {
+        console.error("Failed to archive case", err);
+      } finally {
+        setArchivingCase(false);
+      }
+    }
+  };
+
+  const handleOpenEdit = () => {
+    if (!selectedCase) return;
+    setEditCaseData({
+      id: selectedCase.id,
+      title: selectedCase.title,
+      caseNumber: selectedCase.caseNumber,
+      firNumber: selectedCase.firNumber || '',
+      clientNameRaw: selectedCase.client || '',
+      clientId: selectedCase.clientId || null,
+      courtName: selectedCase.court || '',
+      judgeName: selectedCase.judge || '',
+      opposingCounsel: selectedCase.opposingCounsel || '',
+      caseType: selectedCase.type || 'Civil',
+      priority: selectedCase.priority || 'Medium',
+      status: selectedCase.status || 'Active',
+      description: selectedCase.description || '',
+      filedDate: selectedCase.filedDate || '',
+      nextDate: selectedCase.nextHearing || ''
+    });
+    setShowEditCase(true);
+  };
+
+  const handleUpdateCase = async () => {
+    if (!editCaseData) return;
+    try {
+      setUpdatingCase(true);
+      const payload = {
+        id: editCaseData.id,
+        title: editCaseData.title,
+        caseNumber: editCaseData.caseNumber,
+        firNumber: editCaseData.firNumber,
+        clientNameRaw: editCaseData.clientNameRaw,
+        courtName: editCaseData.courtName,
+        judgeName: editCaseData.judgeName,
+        opposingCounsel: editCaseData.opposingCounsel,
+        caseType: editCaseData.caseType,
+        priority: editCaseData.priority,
+        status: editCaseData.status,
+        description: editCaseData.description,
+        filingDate: editCaseData.filedDate ? new Date(editCaseData.filedDate).toISOString() : undefined,
+        nextDate: editCaseData.nextDate ? editCaseData.nextDate : undefined
+      };
+      
+      await api.updateCase(editCaseData.id, payload);
+      setShowEditCase(false);
+      await loadCaseDetails(editCaseData.id);
+      await loadCasesList();
+    } catch (err) {
+      console.error("Failed to update case details", err);
+    } finally {
+      setUpdatingCase(false);
+    }
+  };
+
+  const handleAddEvent = async () => {
+    if (!selectedCase) return;
+    try {
+      setAddingEvent(true);
+      await api.addCaseTimelineEvent(selectedCase.id, {
+        eventType: newEventData.eventType,
+        title: newEventData.title,
+        description: newEventData.description,
+        eventDate: new Date(newEventData.eventDate).toISOString()
+      });
+      setShowAddEvent(false);
+      setNewEventData({
+        eventType: 'Hearing',
+        title: '',
+        description: '',
+        eventDate: new Date().toISOString().split('T')[0]
+      });
+      await loadCaseDetails(selectedCase.id);
+    } catch (err) {
+      console.error("Failed to add event", err);
+    } finally {
+      setAddingEvent(false);
     }
   };
 
@@ -449,6 +706,15 @@ export default function CaseManagement() {
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-sm text-muted-foreground font-sans">Connecting to secure cases vault...</p>
+      </div>
+    );
+  }
+
+  if (loadingDetails) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground font-sans">Retrieving case records & history...</p>
       </div>
     );
   }
@@ -496,11 +762,11 @@ export default function CaseManagement() {
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <Button variant="outline" size="sm" className="text-xs font-sans h-8 gap-1.5 border-border/50">
+              <Button variant="outline" size="sm" className="text-xs font-sans h-8 gap-1.5 border-border/50" onClick={handleOpenEdit}>
                 <Edit className="h-3.5 w-3.5" /> Edit
               </Button>
-              <Button variant="outline" size="sm" className="text-xs font-sans h-8 gap-1.5 border-border/50">
-                <Download className="h-3.5 w-3.5" /> Export
+              <Button variant="outline" size="sm" className="text-xs font-sans h-8 gap-1.5 border-border/50 text-destructive hover:bg-destructive/10" onClick={handleArchiveCase} disabled={archivingCase}>
+                <Trash2 className="h-3.5 w-3.5" /> {archivingCase ? 'Archiving...' : 'Archive'}
               </Button>
             </div>
           </div>
@@ -628,69 +894,93 @@ export default function CaseManagement() {
           >
             {/* Timeline */}
             {detailTab === 'timeline' && (
-              <div className="relative">
-                <div className="absolute left-[19px] top-2 bottom-2 w-px bg-border" />
-                <div className="space-y-0">
-                  {selectedCase.timeline.map((event, i) => {
-                    const Icon = timelineIcon[event.type] || Clock;
-                    return (
-                      <div key={event.id} className="relative flex gap-4 pb-5">
-                        <div className={`relative z-10 h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${timelineColor[event.type]}`}>
-                          <Icon className="h-4 w-4" />
-                        </div>
-                        <div className="pt-1 min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="text-sm font-medium font-sans text-foreground">{event.title}</p>
-                            <span className="text-[10px] text-muted-foreground font-sans whitespace-nowrap">{event.date}</span>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground font-sans mt-0.5 leading-relaxed">{event.description}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
+              <div className="space-y-4">
+                <div className="flex justify-end">
+                  <Button size="sm" className="bg-gradient-primary text-xs font-sans gap-1.5 h-8" onClick={() => setShowAddEvent(true)}>
+                    <Plus className="h-3.5 w-3.5" /> Add Event
+                  </Button>
                 </div>
+                {selectedCase.timeline.length === 0 ? (
+                  <div className="text-center py-6 text-xs text-muted-foreground font-sans border border-dashed rounded-lg">
+                    No timeline history found. Start by adding key events.
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="absolute left-[19px] top-2 bottom-2 w-px bg-border" />
+                    <div className="space-y-0">
+                      {selectedCase.timeline.map((event, i) => {
+                        const Icon = timelineIcon[event.type] || Clock;
+                        return (
+                          <div key={event.id} className="relative flex gap-4 pb-5">
+                            <div className={`relative z-10 h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${timelineColor[event.type]}`}>
+                              <Icon className="h-4 w-4" />
+                            </div>
+                            <div className="pt-1 min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-medium font-sans text-foreground">{event.title}</p>
+                                <span className="text-[10px] text-muted-foreground font-sans whitespace-nowrap">{event.date}</span>
+                              </div>
+                              <p className="text-[11px] text-muted-foreground font-sans mt-0.5 leading-relaxed">{event.description}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Documents */}
             {detailTab === 'documents' && (
               <div className="space-y-3">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={handleUploadDocument}
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                />
                 <div className="flex justify-end">
-                  <Button size="sm" className="bg-gradient-primary text-xs font-sans gap-1.5 h-8">
-                    <Upload className="h-3.5 w-3.5" /> Upload Document
+                  <Button size="sm" className="bg-gradient-primary text-xs font-sans gap-1.5 h-8" onClick={handleUploadDocumentClick} disabled={uploadingDoc}>
+                    {uploadingDoc ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} Upload Document
                   </Button>
                 </div>
-                {selectedCase.documents.map(doc => (
-                  <Card key={doc.id} className="border-border/50 shadow-sm hover:shadow-md transition-all duration-200">
-                    <CardContent className="p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center shrink-0">
-                            <FileText className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <p className="text-sm font-medium font-sans text-foreground truncate">{doc.name}</p>
-                              {doc.confidential && (
-                                <Badge variant="outline" className="text-[9px] font-sans text-destructive border-destructive/20 gap-0.5">
-                                  <AlertTriangle className="h-2.5 w-2.5" /> Confidential
-                                </Badge>
-                              )}
+                {selectedCase.documents.length === 0 ? (
+                  <div className="text-center py-6 text-xs text-muted-foreground font-sans border border-dashed rounded-lg">
+                    No documents uploaded. Click upload to store files securely in this case.
+                  </div>
+                ) : (
+                  selectedCase.documents.map(doc => (
+                    <Card key={doc.id} className="border-border/50 shadow-sm hover:shadow-md transition-all duration-200">
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="h-9 w-9 rounded-lg bg-secondary flex items-center justify-center shrink-0">
+                              <FileText className="h-4 w-4 text-muted-foreground" />
                             </div>
-                            <p className="text-[10px] text-muted-foreground font-sans mt-0.5">
-                              {doc.size} · Uploaded by {doc.uploadedBy} · {doc.uploadedAt}
-                            </p>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-sm font-medium font-sans text-foreground truncate">{doc.name}</p>
+                              </div>
+                              <p className="text-[10px] text-muted-foreground font-sans mt-0.5">
+                                {doc.size} · Uploaded {doc.uploadedAt}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Badge variant="secondary" className="text-[9px] font-sans">{doc.type}</Badge>
+                            {doc.url && (
+                              <a href={doc.url} target="_blank" rel="noopener noreferrer">
+                                <Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="h-3.5 w-3.5" /></Button>
+                              </a>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <Badge variant="secondary" className="text-[9px] font-sans">{doc.type}</Badge>
-                          <Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="h-3.5 w-3.5" /></Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7"><Download className="h-3.5 w-3.5" /></Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
               </div>
             )}
 
@@ -708,30 +998,41 @@ export default function CaseManagement() {
                       className="text-sm font-sans min-h-[80px] bg-secondary/30 border-border/50 resize-none"
                     />
                     <div className="flex justify-end mt-2">
-                      <Button size="sm" className="bg-gradient-primary text-xs font-sans gap-1.5 h-8" disabled={!newNote.trim()}>
-                        <Plus className="h-3.5 w-3.5" /> Save Note
+                      <Button size="sm" className="bg-gradient-primary text-xs font-sans gap-1.5 h-8" onClick={handleAddNote} disabled={savingNote || !newNote.trim()}>
+                        {savingNote ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Save Note
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
 
                 {/* Existing Notes */}
-                {selectedCase.notes.map(note => (
-                  <Card key={note.id} className="border-border/50 shadow-sm">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
-                            <User className="h-3 w-3 text-primary" />
+                {selectedCase.notes.length === 0 ? (
+                  <div className="text-center py-6 text-xs text-muted-foreground font-sans border border-dashed rounded-lg">
+                    No notes recorded yet.
+                  </div>
+                ) : (
+                  selectedCase.notes.map(note => (
+                    <Card key={note.id} className="border-border/50 shadow-sm">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                              <User className="h-3 w-3 text-primary" />
+                            </div>
+                            <span className="text-xs font-semibold font-sans text-foreground">{note.author}</span>
                           </div>
-                          <span className="text-xs font-semibold font-sans text-foreground">{note.author}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-muted-foreground font-sans">{note.date}</span>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteNote(note.id)}>
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
-                        <span className="text-[10px] text-muted-foreground font-sans">{note.date}</span>
-                      </div>
-                      <p className="text-sm text-foreground/80 font-sans leading-relaxed">{note.content}</p>
-                    </CardContent>
-                  </Card>
-                ))}
+                        <p className="text-sm text-foreground/80 font-sans leading-relaxed">{note.content}</p>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
               </div>
             )}
           </motion.div>
@@ -900,7 +1201,7 @@ export default function CaseManagement() {
             <Card
               key={c.id}
               className="border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group"
-              onClick={() => { setSelectedCase(c); setDetailTab('timeline'); }}
+              onClick={() => { loadCaseDetails(c.id); setDetailTab('timeline'); }}
             >
               <CardContent className="p-4">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -973,7 +1274,32 @@ export default function CaseManagement() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-sans">Client Name *</Label>
-              <Input value={newCaseData.client} onChange={e => setNewCaseData({...newCaseData, client: e.target.value})} placeholder="Client or company name" className="h-9 text-sm font-sans" />
+              {clients.length > 0 ? (
+                <Select
+                  value={newCaseData.clientId}
+                  onValueChange={val => {
+                    const matched = clients.find(cl => cl.id === val);
+                    setNewCaseData({
+                      ...newCaseData,
+                      clientId: val,
+                      client: matched ? matched.fullName || matched.name : ''
+                    });
+                  }}
+                >
+                  <SelectTrigger className="h-9 text-xs font-sans bg-card border-border/50">
+                    <SelectValue placeholder="Select existing client..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map(cl => (
+                      <SelectItem key={cl.id} value={cl.id} className="text-xs font-sans">
+                        {cl.fullName || cl.name} ({cl.email || 'No email'})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={newCaseData.client} onChange={e => setNewCaseData({...newCaseData, client: e.target.value})} placeholder="Client or company name" className="h-9 text-sm font-sans" />
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -1043,6 +1369,175 @@ export default function CaseManagement() {
             </Button>
             <Button size="sm" className="bg-gradient-primary font-sans text-xs gap-1.5" onClick={handleAddCase} disabled={addingCase || !newCaseData.title || !newCaseData.caseNumber || !newCaseData.client}>
               {addingCase ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Create Case
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Case Dialog */}
+      <Dialog open={showEditCase} onOpenChange={setShowEditCase}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base font-sans">Edit Case Details</DialogTitle>
+            <DialogDescription className="text-xs font-sans text-muted-foreground">
+              Modify the case details and parameters below.
+            </DialogDescription>
+          </DialogHeader>
+          {editCaseData && (
+            <div className="space-y-4 py-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-sans">Case Title *</Label>
+                <Input value={editCaseData.title} onChange={e => setEditCaseData({...editCaseData, title: e.target.value})} className="h-9 text-sm font-sans" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-sans">Case Number *</Label>
+                  <Input value={editCaseData.caseNumber} onChange={e => setEditCaseData({...editCaseData, caseNumber: e.target.value})} className="h-9 text-sm font-sans" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-sans">FIR Number</Label>
+                  <Input value={editCaseData.firNumber} onChange={e => setEditCaseData({...editCaseData, firNumber: e.target.value})} className="h-9 text-sm font-sans" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-sans">Client Name *</Label>
+                <Input value={editCaseData.clientNameRaw} onChange={e => setEditCaseData({...editCaseData, clientNameRaw: e.target.value})} className="h-9 text-sm font-sans" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-sans">Court *</Label>
+                  <Select value={editCaseData.courtName} onValueChange={val => setEditCaseData({...editCaseData, courtName: val})}>
+                    <SelectTrigger className="h-9 text-xs font-sans">
+                      <SelectValue placeholder="Select court" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {courtTypes.filter(c => c !== 'All Courts').map(c => (
+                        <SelectItem key={c} value={c} className="text-xs font-sans">{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-sans">Case Type *</Label>
+                  <Select value={editCaseData.caseType} onValueChange={val => setEditCaseData({...editCaseData, caseType: val})}>
+                    <SelectTrigger className="h-9 text-xs font-sans">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {caseTypes.filter(t => t !== 'All Types').map(t => (
+                        <SelectItem key={t} value={t} className="text-xs font-sans">{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-sans">Assigned Judge</Label>
+                  <Input value={editCaseData.judgeName} onChange={e => setEditCaseData({...editCaseData, judgeName: e.target.value})} className="h-9 text-sm font-sans" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-sans">Opposing Counsel</Label>
+                  <Input value={editCaseData.opposingCounsel} onChange={e => setEditCaseData({...editCaseData, opposingCounsel: e.target.value})} className="h-9 text-sm font-sans" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-sans">Priority</Label>
+                  <Select value={editCaseData.priority} onValueChange={val => setEditCaseData({...editCaseData, priority: val})}>
+                    <SelectTrigger className="h-9 text-xs font-sans">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['Low', 'Medium', 'High', 'Critical'].map(p => (
+                        <SelectItem key={p} value={p} className="text-xs font-sans">{p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-sans">Status</Label>
+                  <Select value={editCaseData.status} onValueChange={val => setEditCaseData({...editCaseData, status: val})}>
+                    <SelectTrigger className="h-9 text-xs font-sans">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pipelineStages.map(s => (
+                        <SelectItem key={s.status} value={s.status} className="text-xs font-sans">{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-sans">Next Hearing Date</Label>
+                  <Input type="date" value={editCaseData.nextDate} onChange={e => setEditCaseData({...editCaseData, nextDate: e.target.value})} className="h-9 text-sm font-sans" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-sans">Filed Date</Label>
+                  <Input type="date" value={editCaseData.filedDate} onChange={e => setEditCaseData({...editCaseData, filedDate: e.target.value})} className="h-9 text-sm font-sans" />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-sans">Case Description</Label>
+                <Textarea value={editCaseData.description} onChange={e => setEditCaseData({...editCaseData, description: e.target.value})} className="text-sm font-sans min-h-[80px] resize-none" />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" size="sm" className="font-sans text-xs" onClick={() => setShowEditCase(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" className="bg-gradient-primary font-sans text-xs gap-1.5" onClick={handleUpdateCase} disabled={updatingCase}>
+              {updatingCase ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Event Dialog */}
+      <Dialog open={showAddEvent} onOpenChange={setShowAddEvent}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-sans">Add Key Case Event</DialogTitle>
+            <DialogDescription className="text-xs font-sans text-muted-foreground">
+              Add a new milestone, hearing, filing, or order to the case timeline.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-sans">Event Type</Label>
+              <Select value={newEventData.eventType} onValueChange={val => setNewEventData({...newEventData, eventType: val})}>
+                <SelectTrigger className="h-9 text-xs font-sans">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {['Hearing', 'Order', 'Filing', 'Adjournment', 'Document', 'Note'].map(type => (
+                    <SelectItem key={type} value={type} className="text-xs font-sans">{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-sans">Event Title *</Label>
+              <Input value={newEventData.title} onChange={e => setNewEventData({...newEventData, title: e.target.value})} placeholder="e.g. Interim injunction argued" className="h-9 text-sm font-sans" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-sans">Event Date *</Label>
+              <Input type="date" value={newEventData.eventDate} onChange={e => setNewEventData({...newEventData, eventDate: e.target.value})} className="h-9 text-sm font-sans" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-sans">Event Description</Label>
+              <Textarea value={newEventData.description} onChange={e => setNewEventData({...newEventData, description: e.target.value})} placeholder="Describe details of this milestone..." className="text-sm font-sans min-h-[80px] resize-none" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" className="font-sans text-xs" onClick={() => setShowAddEvent(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" className="bg-gradient-primary font-sans text-xs gap-1.5" onClick={handleAddEvent} disabled={addingEvent || !newEventData.title}>
+              {addingEvent ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add Event
             </Button>
           </DialogFooter>
         </DialogContent>

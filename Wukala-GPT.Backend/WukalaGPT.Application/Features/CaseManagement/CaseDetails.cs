@@ -1,10 +1,12 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using WukalaGPT.Application.Interfaces;
+using WukalaGPT.Application.DTOs.Document;
 using WukalaGPT.Domain.Entities;
 using WukalaGPT.Domain.Enums;
 
@@ -20,6 +22,7 @@ public class CaseDetailsDto : CaseDto
     public List<CaseAssignmentDto> Assignments { get; set; } = new();
     public List<CaseLinkDto> LinkedCases { get; set; } = new();
     public List<CaseDeadlineDto> Deadlines { get; set; } = new();
+    public List<DocumentResponseDto> Documents { get; set; } = new();
 }
 
 public class CaseTimelineEventDto
@@ -95,6 +98,7 @@ public class GetCaseDetailsQueryHandler : IRequestHandler<GetCaseDetailsQuery, C
             .Include(c => c.Deadlines)
             .Include(c => c.SourceLinks)
             .Include(c => c.TargetLinks)
+            .Include(c => c.Documents)
             .FirstOrDefaultAsync(c => c.Id == request.CaseId && !c.IsArchived, cancellationToken);
 
         if (caseEntity == null)
@@ -164,6 +168,19 @@ public class GetCaseDetailsQueryHandler : IRequestHandler<GetCaseDetailsQuery, C
                 DueDate = d.DueDate,
                 IsDone = d.IsDone,
                 Priority = d.Priority
+            }).ToList(),
+
+            Documents = caseEntity.Documents.Select(d => new DocumentResponseDto
+            {
+                Id = d.Id,
+                Name = !string.IsNullOrEmpty(d.DefaultTitle) ? d.DefaultTitle : d.FileName,
+                Url = d.FileUrl,
+                SizeInBytes = d.SizeInBytes,
+                SizeFormatted = $"{(d.SizeInBytes / 1024.0 / 1024.0):F1} MB",
+                Classification = d.Classification.ToString(),
+                MimeType = d.MimeType,
+                UploadedAt = d.UploadedAt,
+                TimeAgo = "Just now"
             }).ToList()
         };
         

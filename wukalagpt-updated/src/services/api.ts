@@ -476,11 +476,14 @@ export const api = {
   /**
    * Upload a new document
    */
-  uploadDocument: async (file: File, optionalTitle?: string) => {
+  uploadDocument: async (file: File, optionalTitle?: string, legalCaseId?: string) => {
     const formData = new FormData();
     formData.append('File', file);
     if (optionalTitle) {
       formData.append('OptionalTitle', optionalTitle);
+    }
+    if (legalCaseId) {
+      formData.append('LegalCaseId', legalCaseId);
     }
     return request<DocumentResponse>('/Documents', {
       method: 'POST',

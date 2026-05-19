@@ -218,10 +218,19 @@ public class CreateCaseCommandHandler : IRequestHandler<CreateCaseCommand, CaseD
 public class UpdateCaseCommand : IRequest<CaseDto>
 {
     public Guid Id { get; set; }
+    public string? Title { get; set; }
+    public string? CaseNumber { get; set; }
+    public string? FirNumber { get; set; }
+    public string? ClientNameRaw { get; set; }
+    public string? CourtName { get; set; }
+    public string? CaseType { get; set; }
+    public string? Priority { get; set; }
     public string? Status { get; set; }
     public string? JudgeName { get; set; }
+    public string? OpposingCounsel { get; set; }
     public DateOnly? NextDate { get; set; }
-    // Other fields as needed
+    public DateTime? FilingDate { get; set; }
+    public string? Description { get; set; }
 }
 
 public class UpdateCaseCommandHandler : IRequestHandler<UpdateCaseCommand, CaseDto>
@@ -240,23 +249,61 @@ public class UpdateCaseCommandHandler : IRequestHandler<UpdateCaseCommand, CaseD
         var caseEntity = await _context.LegalCases.FindAsync(new object[] { request.Id }, cancellationToken);
         if (caseEntity == null) throw new Exception("Case not found");
 
-        if (!string.IsNullOrEmpty(request.Status))
-            caseEntity.Status = Enum.Parse<CaseStatus>(request.Status, true);
+        if (!string.IsNullOrEmpty(request.Title))
+            caseEntity.Title = request.Title;
+
+        if (!string.IsNullOrEmpty(request.CaseNumber))
+            caseEntity.CaseNumber = request.CaseNumber;
+
+        if (request.FirNumber != null)
+            caseEntity.FirNumber = request.FirNumber;
+
+        if (!string.IsNullOrEmpty(request.ClientNameRaw))
+            caseEntity.ClientNameRaw = request.ClientNameRaw;
+
+        if (!string.IsNullOrEmpty(request.CourtName))
+            caseEntity.CourtName = request.CourtName;
+
+        if (!string.IsNullOrEmpty(request.CaseType) && Enum.TryParse<CaseType>(request.CaseType, true, out var cType))
+            caseEntity.CaseType = cType;
+
+        if (!string.IsNullOrEmpty(request.Priority) && Enum.TryParse<CasePriority>(request.Priority, true, out var cPriority))
+            caseEntity.Priority = cPriority;
+
+        if (!string.IsNullOrEmpty(request.Status) && Enum.TryParse<CaseStatus>(request.Status, true, out var cStatus))
+            caseEntity.Status = cStatus;
             
-        if (!string.IsNullOrEmpty(request.JudgeName))
+        if (request.JudgeName != null)
             caseEntity.JudgeName = request.JudgeName;
+
+        if (request.OpposingCounsel != null)
+            caseEntity.OpposingCounsel = request.OpposingCounsel;
             
         if (request.NextDate.HasValue)
             caseEntity.NextDate = request.NextDate;
 
+        if (request.FilingDate.HasValue)
+            caseEntity.FilingDate = request.FilingDate;
+
+        if (request.Description != null)
+            caseEntity.Description = request.Description;
+
         caseEntity.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
-        
-        // Example logic for sending events based on User Spec
-        // await _mediator.Publish(new CaseUpdatedEvent(caseEntity.Id), cancellationToken);
 
-        return new CaseDto { Id = caseEntity.Id, Title = caseEntity.Title, Status = caseEntity.Status };
+        return new CaseDto 
+        { 
+            Id = caseEntity.Id, 
+            Title = caseEntity.Title, 
+            Status = caseEntity.Status,
+            CaseNumber = caseEntity.CaseNumber,
+            ClientNameRaw = caseEntity.ClientNameRaw,
+            CourtName = caseEntity.CourtName,
+            JudgeName = caseEntity.JudgeName,
+            OpposingCounsel = caseEntity.OpposingCounsel,
+            Description = caseEntity.Description
+        };
     }
 }
 
