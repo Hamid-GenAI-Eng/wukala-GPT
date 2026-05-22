@@ -57,6 +57,7 @@ public class GetCasesQuery : IRequest<PaginatedList<CaseDto>>
     public int Page { get; set; } = 1;
     public int Limit { get; set; } = 20;
     public Guid FirmId { get; set; }
+    public Guid UserId { get; set; }
 }
 
 public class GetCasesQueryHandler : IRequestHandler<GetCasesQuery, PaginatedList<CaseDto>>
@@ -80,7 +81,16 @@ public class GetCasesQueryHandler : IRequestHandler<GetCasesQuery, PaginatedList
             return JsonSerializer.Deserialize<PaginatedList<CaseDto>>(cachedData) ?? new PaginatedList<CaseDto>();
         }
 
-        var query = _context.LegalCases.AsNoTracking().Where(c => !c.IsArchived && c.FirmId == request.FirmId);
+        var query = _context.LegalCases.AsNoTracking().Where(c => !c.IsArchived);
+        
+        if (request.FirmId != Guid.Empty)
+        {
+            query = query.Where(c => c.FirmId == request.FirmId);
+        }
+        else
+        {
+            query = query.Where(c => c.LeadLawyerId == request.UserId);
+        }
 
         if (!string.IsNullOrEmpty(request.Status))
         {

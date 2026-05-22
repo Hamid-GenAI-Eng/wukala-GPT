@@ -30,16 +30,28 @@ public class ExpenseController : ControllerBase
         _context = context;
     }
 
+    private Guid GetUserId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");
+        return claim != null ? Guid.Parse(claim.Value) : Guid.Empty;
+    }
+
     private Guid GetFirmId()
     {
-        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (Guid.TryParse(userIdString, out var userId))
+        var claimValue = User.FindFirstValue("FirmId");
+        if (!string.IsNullOrEmpty(claimValue) && Guid.TryParse(claimValue, out var firmId))
+        {
+            return firmId;
+        }
+
+        var userId = GetUserId();
+        if (userId != Guid.Empty)
         {
             var user = _context.Users.Find(userId);
             if (user?.FirmId != null) return user.FirmId.Value;
         }
         
-        throw new UnauthorizedAccessException("User is not associated with a firm.");
+        return Guid.Empty;
     }
 
     [HttpPost]

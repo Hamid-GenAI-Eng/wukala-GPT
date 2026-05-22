@@ -23,6 +23,12 @@ public class TeamController : ControllerBase
         _context = context;
     }
 
+    private Guid GetUserId()
+    {
+        var claim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");
+        return claim != null ? Guid.Parse(claim.Value) : Guid.Empty;
+    }
+
     private Guid GetFirmId()
     {
         var claimValue = User.FindFirstValue("FirmId");
@@ -31,21 +37,14 @@ public class TeamController : ControllerBase
             return firmId;
         }
 
-        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (Guid.TryParse(userIdString, out var userId))
+        var userId = GetUserId();
+        if (userId != Guid.Empty)
         {
             var user = _context.Users.Find(userId);
             if (user?.FirmId != null) return user.FirmId.Value;
         }
         
-        throw new UnauthorizedAccessException("User is not associated with a firm.");
-    }
-
-
-    private Guid GetUserId()
-    {
-        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.Parse(userIdString ?? Guid.Empty.ToString());
+        return Guid.Empty;
     }
 
     [HttpGet("members")]

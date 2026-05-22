@@ -121,191 +121,7 @@ const pipelineStages: { label: string; status: CaseStatus }[] = [
   { label: 'Appeal', status: 'Appeal' },
 ];
 
-// ─── Mock Data ──────────────────────────────────────────────────────
-const cases: CaseFile[] = [
-  {
-    id: 'CS-2024-001',
-    title: 'Khan Industries v. Federal Board of Revenue',
-    caseNumber: 'WP No. 12847/2024',
-    client: 'Khan Industries Ltd.',
-    court: 'Lahore High Court',
-    judge: 'Justice Malik Shahzad Ahmad',
-    opposingCounsel: 'Adv. Tariq Hussain (FBR Panel)',
-    type: 'Tax',
-    status: 'Active',
-    priority: 'High',
-    nextHearing: '2024-03-15',
-    stage: 'Arguments',
-    filedDate: '2024-01-10',
-    description: 'Constitutional petition challenging FBR tax assessment order for fiscal year 2022-23. Client contends that the assessment was made without proper notice under Section 122 of the Income Tax Ordinance 2001.',
-    linkedCases: ['CS-2024-005'],
-    timeline: [
-      { id: 1, date: '2024-03-10', title: 'Written arguments submitted', description: 'Filed written arguments on constitutional grounds per court direction', type: 'filing' },
-      { id: 2, date: '2024-03-01', title: 'Hearing — Arguments commenced', description: 'Court heard preliminary arguments. FBR counsel requested adjournment for counter-affidavit.', type: 'hearing' },
-      { id: 3, date: '2024-02-15', title: 'Counter-affidavit received', description: 'FBR filed para-wise reply denying all allegations', type: 'document' },
-      { id: 4, date: '2024-02-01', title: 'Stay order granted', description: 'Hon\'ble court stayed recovery proceedings till next date of hearing', type: 'order' },
-      { id: 5, date: '2024-01-20', title: 'Notice issued to respondents', description: 'Court issued notice returnable in 2 weeks', type: 'order' },
-      { id: 6, date: '2024-01-10', title: 'Petition filed', description: 'Constitutional petition filed under Article 199 of the Constitution', type: 'filing' },
-    ],
-    notes: [
-      { id: 1, author: 'Adv. Ahmed', date: '2024-03-10', content: 'Strong precedent found — 2022 SCMR 1547 supports our position on Section 122 notice requirements. Use in next arguments.' },
-      { id: 2, author: 'Adv. Sara Malik', date: '2024-02-20', content: 'Client provided additional bank statements for FY 2022-23. Stored in Document Vault under evidence folder.' },
-      { id: 3, author: 'Adv. Ahmed', date: '2024-01-15', content: 'Initial case strategy: Challenge on procedural grounds first, then substantive tax computation errors.' },
-    ],
-    documents: [
-      { id: 1, name: 'Constitutional Petition - WP 12847.pdf', type: 'PDF', size: '2.4 MB', uploadedBy: 'Adv. Ahmed', uploadedAt: '2024-01-10', confidential: false },
-      { id: 2, name: 'FBR Assessment Order.pdf', type: 'PDF', size: '890 KB', uploadedBy: 'Adv. Sara', uploadedAt: '2024-01-08', confidential: true },
-      { id: 3, name: 'Stay Order - 01 Feb 2024.pdf', type: 'PDF', size: '156 KB', uploadedBy: 'Adv. Ahmed', uploadedAt: '2024-02-01', confidential: false },
-      { id: 4, name: 'Written Arguments Draft.docx', type: 'DOCX', size: '340 KB', uploadedBy: 'Adv. Ahmed', uploadedAt: '2024-03-09', confidential: false },
-      { id: 5, name: 'Bank Statements FY22-23.xlsx', type: 'XLSX', size: '1.2 MB', uploadedBy: 'Client', uploadedAt: '2024-02-18', confidential: true },
-    ],
-  },
-  {
-    id: 'CS-2024-002',
-    title: 'State v. Ali Raza',
-    caseNumber: 'FIR No. 447/2023 — Sessions Trial No. 89/2024',
-    firNumber: '447/2023',
-    client: 'Ali Raza (Defendant)',
-    court: 'Sessions Court, Islamabad',
-    judge: 'Judge Farooq Ahmed Bhatti',
-    opposingCounsel: 'Deputy Prosecutor General',
-    type: 'Criminal',
-    status: 'Active',
-    priority: 'Critical',
-    nextHearing: '2024-03-12',
-    stage: 'Evidence',
-    filedDate: '2024-01-05',
-    description: 'Criminal trial under Sections 302/34 PPC. Client is accused of murder. Defense strategy focuses on alibi evidence and challenging forensic report credibility.',
-    linkedCases: [],
-    timeline: [
-      { id: 1, date: '2024-03-05', title: 'Prosecution witness #4 examined', description: 'Cross-examination of eye-witness completed. Several contradictions highlighted.', type: 'hearing' },
-      { id: 2, date: '2024-02-20', title: 'Prosecution witness #3 examined', description: 'Forensic expert examined. Defense challenged chain of custody of evidence.', type: 'hearing' },
-      { id: 3, date: '2024-02-05', title: 'Charge framed', description: 'Charge framed under Section 302/34 PPC. Accused pleaded not guilty.', type: 'order' },
-      { id: 4, date: '2024-01-15', title: 'Bail denied', description: 'Post-arrest bail application dismissed. Will approach High Court.', type: 'order' },
-      { id: 5, date: '2024-01-05', title: 'Case registered', description: 'FIR No. 447/2023 registered at PS Margalla, Islamabad', type: 'filing' },
-    ],
-    notes: [
-      { id: 1, author: 'Adv. Ahmed', date: '2024-03-06', content: 'Key contradictions in PW-4 testimony: Witness said he was at the scene at 9 PM but mobile data shows him 15 km away. Strong defense point.' },
-      { id: 2, author: 'Adv. Hassan Raza', date: '2024-02-21', content: 'Forensic report chain of custody is weak. 36-hour gap between evidence collection and lab submission. Will argue contamination.' },
-    ],
-    documents: [
-      { id: 1, name: 'FIR No. 447-2023.pdf', type: 'PDF', size: '320 KB', uploadedBy: 'Adv. Ahmed', uploadedAt: '2024-01-06', confidential: true },
-      { id: 2, name: 'Bail Application.pdf', type: 'PDF', size: '450 KB', uploadedBy: 'Adv. Ahmed', uploadedAt: '2024-01-12', confidential: false },
-      { id: 3, name: 'Forensic Report - Exhibit A.pdf', type: 'PDF', size: '1.8 MB', uploadedBy: 'Court', uploadedAt: '2024-02-18', confidential: true },
-    ],
-  },
-  {
-    id: 'CS-2024-003',
-    title: 'Noor Enterprises Partnership Dispute',
-    caseNumber: 'Civil Suit No. 234/2024',
-    client: 'Noor Enterprises',
-    court: 'Civil Court, Karachi',
-    judge: 'Justice Aisha Siddiqui',
-    opposingCounsel: 'Adv. Kamran Sheikh',
-    type: 'Civil',
-    status: 'Discovery',
-    priority: 'Medium',
-    nextHearing: '2024-03-20',
-    stage: 'Discovery',
-    filedDate: '2024-01-18',
-    description: 'Partnership dissolution suit. Client seeks accounting of partnership assets and profits for the last 5 years. Opposing party refusing to share financial records.',
-    linkedCases: [],
-    timeline: [
-      { id: 1, date: '2024-03-05', title: 'Discovery order issued', description: 'Court directed defendant to produce partnership financial records within 14 days', type: 'order' },
-      { id: 2, date: '2024-02-15', title: 'Written statement filed by defendant', description: 'Defendant denied allegations of misappropriation', type: 'filing' },
-      { id: 3, date: '2024-01-25', title: 'Summons served', description: 'Defendant served through court process server', type: 'order' },
-      { id: 4, date: '2024-01-18', title: 'Suit filed', description: 'Civil suit for dissolution and accounting filed', type: 'filing' },
-    ],
-    notes: [
-      { id: 1, author: 'Adv. Ahmed', date: '2024-03-06', content: 'If defendant fails to produce records by March 19, will file contempt application. Also preparing alternate evidence from client\'s own records.' },
-    ],
-    documents: [
-      { id: 1, name: 'Plaint - Civil Suit 234.pdf', type: 'PDF', size: '1.1 MB', uploadedBy: 'Adv. Ahmed', uploadedAt: '2024-01-18', confidential: false },
-      { id: 2, name: 'Partnership Deed (Original).pdf', type: 'PDF', size: '680 KB', uploadedBy: 'Client', uploadedAt: '2024-01-16', confidential: true },
-    ],
-  },
-  {
-    id: 'CS-2024-004',
-    title: 'Islamabad Realty Property Dispute',
-    caseNumber: 'CPLA No. 567/2024',
-    client: 'Islamabad Realty Corp.',
-    court: 'Supreme Court of Pakistan',
-    judge: 'CJ Qazi Faez Isa',
-    opposingCounsel: 'Adv. Barrister Salman Akram Raja',
-    type: 'Property',
-    status: 'Appeal',
-    priority: 'High',
-    nextHearing: '2024-04-01',
-    stage: 'Appeal',
-    filedDate: '2024-02-01',
-    description: 'Civil Petition for Leave to Appeal against Islamabad High Court judgment in a property dispute involving 500 kanal land in Zone-IV, Islamabad.',
-    linkedCases: [],
-    timeline: [
-      { id: 1, date: '2024-02-20', title: 'CPLA admitted for regular hearing', description: 'Supreme Court admitted the petition and issued notice to respondents', type: 'order' },
-      { id: 2, date: '2024-02-01', title: 'CPLA filed', description: 'Petition filed against IHC judgment dated 15-01-2024', type: 'filing' },
-    ],
-    notes: [],
-    documents: [
-      { id: 1, name: 'CPLA Petition.pdf', type: 'PDF', size: '3.5 MB', uploadedBy: 'Adv. Ahmed', uploadedAt: '2024-02-01', confidential: false },
-      { id: 2, name: 'IHC Impugned Judgment.pdf', type: 'PDF', size: '2.1 MB', uploadedBy: 'Adv. Ahmed', uploadedAt: '2024-01-30', confidential: false },
-    ],
-  },
-  {
-    id: 'CS-2024-005',
-    title: 'Fatima Enterprises v. National Bank of Pakistan',
-    caseNumber: 'Banking Suit No. 78/2024',
-    client: 'Fatima Enterprises',
-    court: 'Banking Court, Lahore',
-    judge: 'Judge Rizwan Ul Haq',
-    opposingCounsel: 'Adv. NBP Legal Division',
-    type: 'Banking',
-    status: 'Active',
-    priority: 'Medium',
-    nextHearing: '2024-03-18',
-    stage: 'Hearing',
-    filedDate: '2024-01-22',
-    description: 'Recovery suit filed by NBP for outstanding loan facility of PKR 25 Million. Client disputes the calculation of mark-up and claims overpayment.',
-    linkedCases: ['CS-2024-001'],
-    timeline: [
-      { id: 1, date: '2024-03-08', title: 'Counter-claim filed', description: 'Filed counter-claim for overpayment of PKR 3.2 Million', type: 'filing' },
-      { id: 2, date: '2024-02-20', title: 'Written statement filed', description: 'Denied bank\'s claim of outstanding amount. Produced payment receipts.', type: 'filing' },
-      { id: 3, date: '2024-01-22', title: 'Suit filed by NBP', description: 'NBP filed recovery suit under Financial Institutions Ordinance 2001', type: 'filing' },
-    ],
-    notes: [
-      { id: 1, author: 'Adv. Ahmed', date: '2024-03-09', content: 'Hired forensic accountant to audit the mark-up calculation. Report expected in 10 days.' },
-    ],
-    documents: [
-      { id: 1, name: 'NBP Plaint.pdf', type: 'PDF', size: '1.4 MB', uploadedBy: 'Court', uploadedAt: '2024-01-22', confidential: false },
-      { id: 2, name: 'Payment Receipts Bundle.pdf', type: 'PDF', size: '4.8 MB', uploadedBy: 'Client', uploadedAt: '2024-02-15', confidential: true },
-    ],
-  },
-  {
-    id: 'CS-2024-006',
-    title: 'Workers Union Collective Bargaining',
-    caseNumber: 'Labour Case No. 12/2024',
-    client: 'Pakistan Workers Union',
-    court: 'Labour Court, Faisalabad',
-    judge: 'Judge Tariq Mehmood',
-    opposingCounsel: 'Adv. Zulfiqar Ali (Management Counsel)',
-    type: 'Labour',
-    status: 'Negotiation',
-    priority: 'Low',
-    nextHearing: '2024-03-25',
-    stage: 'Mediation',
-    filedDate: '2024-02-10',
-    description: 'Collective bargaining dispute regarding minimum wage increase and workplace safety standards for textile factory workers in Faisalabad.',
-    linkedCases: [],
-    timeline: [
-      { id: 1, date: '2024-03-01', title: 'Mediation session — partial agreement', description: 'Management agreed on safety standards. Wage negotiation continues.', type: 'hearing' },
-      { id: 2, date: '2024-02-15', title: 'First mediation session', description: 'Both parties presented initial positions', type: 'hearing' },
-      { id: 3, date: '2024-02-10', title: 'Reference filed', description: 'Labour dispute reference filed before the Labour Court', type: 'filing' },
-    ],
-    notes: [],
-    documents: [
-      { id: 1, name: 'Charter of Demands.pdf', type: 'PDF', size: '420 KB', uploadedBy: 'Client', uploadedAt: '2024-02-09', confidential: false },
-    ],
-  },
-];
+// Removed dummy data to prevent ghost/mock cases from showing up
 
 // ─── Style Maps ─────────────────────────────────────────────────────
 const statusColor: Record<string, string> = {
@@ -615,7 +431,7 @@ export default function CaseManagement() {
     }
   };
 
-  const loadCasesList = async () => {
+    const loadCasesList = async () => {
     try {
       setLoading(true);
       const res = await api.getCases();
@@ -623,11 +439,11 @@ export default function CaseManagement() {
       if (casesArray && casesArray.length > 0) {
         setCaseList(casesArray.map(normalizeCase));
       } else {
-        setCaseList(cases.map(normalizeCase));
+        setCaseList([]);
       }
     } catch (err) {
       console.error("Failed to load secure cases directory", err);
-      setCaseList(cases.map(normalizeCase));
+      setCaseList([]);
     } finally {
       setLoading(false);
     }

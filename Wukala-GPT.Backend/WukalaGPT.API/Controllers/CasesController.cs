@@ -37,13 +37,13 @@ public class CasesController : ControllerBase
             return firmId;
         }
 
-        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (Guid.TryParse(userIdString, out var userId))
+        var userId = GetUserId();
+        if (userId != Guid.Empty)
         {
             var user = _context.Users.Find(userId);
             if (user?.FirmId != null) return user.FirmId.Value;
         }
-        throw new UnauthorizedAccessException("User is not associated with any firm.");
+        return Guid.Empty;
     }
 
     [HttpGet]
@@ -51,7 +51,7 @@ public class CasesController : ControllerBase
     {
         var result = await _mediator.Send(new GetCasesQuery
         {
-            FirmId = GetFirmId(), Status = status, CaseType = type, Search = search, Page = page, Limit = limit
+            FirmId = GetFirmId(), UserId = GetUserId(), Status = status, CaseType = type, Search = search, Page = page, Limit = limit
         });
         return Ok(result);
     }

@@ -72,6 +72,7 @@ public class PaginatedList<T>
 public class GetClientsQuery : IRequest<PaginatedList<ClientDto>>
 {
     public Guid FirmId { get; set; }
+    public Guid UserId { get; set; }
     public string? Search { get; set; }
     public string? Status { get; set; }
     public string? ClientType { get; set; }
@@ -100,7 +101,16 @@ public class GetClientsQueryHandler : IRequestHandler<GetClientsQuery, Paginated
         if (!string.IsNullOrEmpty(cachedData))
             return JsonSerializer.Deserialize<PaginatedList<ClientDto>>(cachedData)!;
 
-        var q = _db.Clients.AsNoTracking().Where(c => c.FirmId == req.FirmId && !c.IsArchived);
+        var q = _db.Clients.AsNoTracking().Where(c => !c.IsArchived);
+
+        if (req.FirmId != Guid.Empty)
+        {
+            q = q.Where(c => c.FirmId == req.FirmId);
+        }
+        else
+        {
+            q = q.Where(c => c.CreatedById == req.UserId);
+        }
 
         if (!string.IsNullOrEmpty(req.Status)) q = q.Where(c => c.Status == req.Status);
         if (!string.IsNullOrEmpty(req.ClientType)) q = q.Where(c => c.ClientType == req.ClientType);
