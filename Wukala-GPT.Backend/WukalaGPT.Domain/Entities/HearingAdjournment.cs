@@ -16,7 +16,6 @@ public class HearingAdjournment
 
     // Firm Scoping Denormalized Log
     public Guid FirmId { get; set; }
-    public Firm Firm { get; set; } = null!;
 
     public Guid AdjournedById { get; set; }
     public User AdjournedBy { get; set; } = null!;

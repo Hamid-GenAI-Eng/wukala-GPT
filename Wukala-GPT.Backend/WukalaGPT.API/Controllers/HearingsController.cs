@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Threading.Tasks;
 using WukalaGPT.Application.Features.Hearings.CQRS;
+using WukalaGPT.Application.Interfaces;
 
 using System.Security.Claims;
 
@@ -15,16 +16,30 @@ namespace WukalaGPT.API.Controllers;
 public class HearingsController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IApplicationDbContext _context;
 
-    public HearingsController(IMediator mediator)
+    public HearingsController(IMediator mediator, IApplicationDbContext context)
     {
         _mediator = mediator;
+        _context = context;
     }
 
     private Guid GetFirmId()
     {
-        var val = User.FindFirstValue("FirmId");
-        return string.IsNullOrEmpty(val) ? Guid.Empty : Guid.Parse(val);
+        var claimValue = User.FindFirstValue("FirmId");
+        if (!string.IsNullOrEmpty(claimValue) && Guid.TryParse(claimValue, out var firmId))
+        {
+            return firmId;
+        }
+
+        var userId = GetUserId();
+        if (userId != Guid.Empty)
+        {
+            var user = _context.Users.Find(userId);
+            if (user?.FirmId != null) return user.FirmId.Value;
+        }
+        
+        return Guid.Empty;
     }
 
     private Guid GetUserId()

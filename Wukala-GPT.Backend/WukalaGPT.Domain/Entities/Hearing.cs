@@ -9,7 +9,6 @@ public class Hearing
     
     // Core Links
     public Guid FirmId { get; set; }
-    public Firm Firm { get; set; } = null!;
 
     public Guid CaseId { get; set; }
     public LegalCase Case { get; set; } = null!;
