@@ -242,6 +242,8 @@ public class UpdateCaseCommand : IRequest<CaseDto>
     public DateOnly? NextDate { get; set; }
     public DateTime? FilingDate { get; set; }
     public string? Description { get; set; }
+    public string? Reason { get; set; }
+    public Guid UserId { get; set; }
 }
 
 public class UpdateCaseCommandHandler : IRequestHandler<UpdateCaseCommand, CaseDto>
@@ -282,7 +284,24 @@ public class UpdateCaseCommandHandler : IRequestHandler<UpdateCaseCommand, CaseD
             caseEntity.Priority = cPriority;
 
         if (!string.IsNullOrEmpty(request.Status) && Enum.TryParse<CaseStatus>(request.Status, true, out var cStatus))
-            caseEntity.Status = cStatus;
+        {
+            if (caseEntity.Status != cStatus)
+            {
+                var oldStatus = caseEntity.Status;
+                caseEntity.Status = cStatus;
+
+                var timelineEvent = new WukalaGPT.Domain.Entities.CaseTimelineEvent
+                {
+                    CaseId = caseEntity.Id,
+                    Title = $"Status Changed: {oldStatus} → {cStatus}",
+                    Description = string.IsNullOrEmpty(request.Reason) ? $"Status transitioned to {cStatus}" : request.Reason,
+                    EventType = WukalaGPT.Domain.Enums.CaseEventType.StatusChange,
+                    EventDate = DateTime.UtcNow,
+                    CreatedById = request.UserId != Guid.Empty ? request.UserId : null
+                };
+                _context.CaseTimelineEvents.Add(timelineEvent);
+            }
+        }
             
         if (request.JudgeName != null)
             caseEntity.JudgeName = request.JudgeName;

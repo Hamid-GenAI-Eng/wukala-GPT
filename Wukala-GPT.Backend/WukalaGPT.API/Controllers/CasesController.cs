@@ -75,6 +75,7 @@ public class CasesController : ControllerBase
     public async Task<IActionResult> UpdateCase(Guid id, [FromBody] UpdateCaseCommand command)
     {
         if (id != command.Id) return BadRequest("Id mismatch.");
+        command.UserId = GetUserId();
         var result = await _mediator.Send(command);
         return Ok(result);
     }
@@ -223,6 +224,6 @@ public class CasesController : ControllerBase
         command.RequesterUserId = GetUserId();
         var success = await _mediator.Send(command);
         if (!success) return BadRequest("Failed to link case.");
-        return Ok();
+        return Ok(new { success = true });
     }
 }

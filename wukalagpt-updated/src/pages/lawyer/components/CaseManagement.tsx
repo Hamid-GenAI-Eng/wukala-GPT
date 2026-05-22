@@ -20,6 +20,16 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -236,6 +246,13 @@ export default function CaseManagement() {
   const [linkTargetId, setLinkTargetId] = useState('');
   const [linkRelationship, setLinkRelationship] = useState('related');
   const [linkNote, setLinkNote] = useState('');
+
+  // Confirmation Dialog States
+  const [confirmDialog, setConfirmDialog] = useState<{ isOpen: boolean; title: string; description: string; onConfirm: () => void; isDestructive?: boolean }>({ isOpen: false, title: '', description: '', onConfirm: () => {} });
+  const [promptDialog, setPromptDialog] = useState<{ isOpen: boolean; title: string; description: string; value: string; onConfirm: (val: string) => void }>({ isOpen: false, title: '', description: '', value: '', onConfirm: () => {} });
+  
+  // Document Viewer State
+  const [docViewer, setDocViewer] = useState<{ isOpen: boolean; url: string; name: string }>({ isOpen: false, url: '', name: '' });
 
   // Resilient helper to parse and format dates safely, avoiding RangeError
   function safeDateString(val: any): string {
@@ -578,30 +595,36 @@ export default function CaseManagement() {
     }
   };
 
-  const handleArchiveCase = async () => {
+  const handleArchiveCase = () => {
     if (!selectedCase) return;
-    if (confirm("Are you sure you want to archive this case? It will be removed from active listings.")) {
-      try {
-        setArchivingCase(true);
-        await api.archiveCase(selectedCase.id);
-        setSelectedCase(null);
-        toast({
-          title: "Case Archived",
-          description: "Case successfully archived."
-        });
-        await loadCasesList();
-      } catch (err: any) {
-        console.error("Failed to archive case", err);
-        const errMsg = err?.message || "An unexpected error occurred.";
-        toast({
-          variant: "destructive",
-          title: "Failed to Archive Case",
-          description: errMsg
-        });
-      } finally {
-        setArchivingCase(false);
+    setConfirmDialog({
+      isOpen: true,
+      title: "Archive Case",
+      description: "Are you sure you want to archive this case? It will be removed from active listings.",
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          setArchivingCase(true);
+          await api.archiveCase(selectedCase.id);
+          setSelectedCase(null);
+          toast({
+            title: "Case Archived",
+            description: "Case successfully archived."
+          });
+          await loadCasesList();
+        } catch (err: any) {
+          console.error("Failed to archive case", err);
+          const errMsg = err?.message || "An unexpected error occurred.";
+          toast({
+            variant: "destructive",
+            title: "Failed to Archive Case",
+            description: errMsg
+          });
+        } finally {
+          setArchivingCase(false);
+        }
       }
-    }
+    });
   };
 
   const handleOpenEdit = () => {
@@ -728,33 +751,32 @@ export default function CaseManagement() {
     }
   };
 
-  const handleDeleteEvent = async (eventId: string) => {
+  const handleDeleteEvent = (eventId: string) => {
     if (!selectedCase) return;
-    if (!confirm("Are you sure you want to delete this event from the timeline?")) return;
-    try {
-      await api.deleteCaseTimelineEvent(selectedCase.id, eventId);
-      toast({ title: "Event Deleted", description: "The timeline event has been removed." });
-      await loadCaseDetails(selectedCase.id);
-    } catch (err: any) {
-      console.error("Failed to delete event", err);
-      toast({
-        variant: "destructive",
-        title: "Deletion Failed",
-        description: err?.message || "Could not delete timeline event."
-      });
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Event",
+      description: "Are you sure you want to delete this event from the timeline? This cannot be undone.",
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await api.deleteCaseTimelineEvent(selectedCase.id, eventId);
+          toast({ title: "Event Deleted", description: "The timeline event has been removed." });
+          await loadCaseDetails(selectedCase.id);
+        } catch (err: any) {
+          console.error("Failed to delete event", err);
+          toast({
+            variant: "destructive",
+            title: "Deletion Failed",
+            description: err?.message || "Could not delete timeline event."
+          });
+        }
+      }
+    });
   };
 
   const handleDownloadDoc = (url: string, name: string) => {
-    // In a real implementation this would fetch the blob and trigger download
-    // For now we use the anchor download fallback
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = name;
-    a.target = '_blank';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    setDocViewer({ isOpen: true, url, name });
   };
 
   const handleLinkCaseSubmit = async () => {
@@ -803,32 +825,37 @@ export default function CaseManagement() {
       return;
     }
 
-    try {
-      const reason = prompt(`Enter the reason or outcome for status transition to "${targetStatus}":`, "Arguments completed");
-      if (reason === null) return;
+    setPromptDialog({
+      isOpen: true,
+      title: "Confirm Status Transition",
+      description: `Please enter the reason or outcome for moving the case to "${targetStatus}".`,
+      value: "Arguments completed",
+      onConfirm: async (reason: string) => {
+        try {
+          await api.updateCase(selectedCase.id, {
+            id: selectedCase.id,
+            status: targetStatus,
+            reason: reason || undefined
+          });
 
-      await api.updateCase(selectedCase.id, {
-        id: selectedCase.id,
-        status: targetStatus,
-        reason: reason || undefined
-      });
+          toast({
+            title: "Status Transitioned",
+            description: `Case status moved to "${targetStatus}".`
+          });
 
-      toast({
-        title: "Status Transitioned",
-        description: `Case status moved to "${targetStatus}".`
-      });
-
-      await loadCaseDetails(selectedCase.id);
-      await loadCasesList();
-    } catch (err: any) {
-      console.error("Failed to transition status", err);
-      const errMsg = err?.message || "An unexpected error occurred.";
-      toast({
-        variant: "destructive",
-        title: "Transition Failed",
-        description: errMsg
-      });
-    }
+          await loadCaseDetails(selectedCase.id);
+          await loadCasesList();
+        } catch (err: any) {
+          console.error("Failed to transition status", err);
+          const errMsg = err?.message || "An unexpected error occurred.";
+          toast({
+            variant: "destructive",
+            title: "Transition Failed",
+            description: errMsg
+          });
+        }
+      }
+    });
   };
 
   const filteredCases = caseList.filter(c => {
@@ -1410,6 +1437,98 @@ export default function CaseManagement() {
       </div>
       </div>
       )}
+
+      {/* Universal Confirmation Dialog */}
+      <AlertDialog open={confirmDialog.isOpen} onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, isOpen: open }))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialog.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDialog.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              className={confirmDialog.isDestructive ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+              onClick={() => {
+                confirmDialog.onConfirm();
+                setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+              }}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Universal Prompt Dialog */}
+      <Dialog open={promptDialog.isOpen} onOpenChange={(open) => setPromptDialog(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{promptDialog.title}</DialogTitle>
+            <DialogDescription>
+              {promptDialog.description}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input 
+              value={promptDialog.value}
+              onChange={(e) => setPromptDialog(prev => ({ ...prev, value: e.target.value }))}
+              placeholder="Enter reason..."
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPromptDialog(prev => ({ ...prev, isOpen: false }))}>Cancel</Button>
+            <Button onClick={() => {
+              promptDialog.onConfirm(promptDialog.value);
+              setPromptDialog(prev => ({ ...prev, isOpen: false }));
+            }}>Submit</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Document Viewer Dialog */}
+      <Dialog open={docViewer.isOpen} onOpenChange={(open) => setDocViewer(prev => ({ ...prev, isOpen: open }))}>
+        <DialogContent className="max-w-4xl h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="truncate pr-8">{docViewer.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 bg-muted/20 rounded-md overflow-hidden relative">
+            {docViewer.url ? (
+              <iframe 
+                src={docViewer.url} 
+                className="w-full h-full border-0"
+                title={docViewer.name}
+              />
+            ) : (
+              <div className="flex items-center justify-center w-full h-full text-muted-foreground">
+                Document preview not available
+              </div>
+            )}
+          </div>
+          <DialogFooter className="flex justify-between sm:justify-between items-center mt-4">
+            <Button variant="outline" onClick={() => setDocViewer(prev => ({ ...prev, isOpen: false }))}>
+              Close Preview
+            </Button>
+            <Button 
+              onClick={() => {
+                const a = document.createElement('a');
+                a.href = docViewer.url;
+                a.download = docViewer.name;
+                a.target = '_blank';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              }}
+              className="flex items-center gap-2"
+            >
+              Download Securely
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* New Case Dialog */}
       <Dialog open={showNewCase} onOpenChange={setShowNewCase}>
