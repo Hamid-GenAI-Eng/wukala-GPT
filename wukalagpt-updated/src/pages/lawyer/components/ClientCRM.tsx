@@ -42,149 +42,39 @@ interface ClientCase {
 
 interface SharedDocument {
   id: string;
-  name: string;
+  fullName: string;
   type: string;
   sharedDate: string;
   size: string;
 }
 
 interface Client {
-  id: number;
-  name: string;
-  contact: string;
+  id: string;
+  fullName: string;
+  contactPerson: string;
   cnic: string;
   email: string;
   phone: string;
   whatsapp: string;
   city: string;
   address: string;
-  activeCases: number;
-  totalBilled: string;
-  outstandingBalance: string;
-  status: 'Active' | 'Inactive';
+  activeCasesCount: number;
+  totalBilled: number;
+  outstandingBalance: number;
+  status: string;
   vip: boolean;
   tags: string[];
-  dateOnboarded: string;
-  lastContact: string;
-  retentionAlert: boolean;
+  onboardedAt: string;
+  lastContactDate: string;
+  retentionFlagged: boolean;
   portalEnabled: boolean;
-  cases: ClientCase[];
-  interactions: Interaction[];
-  documents: SharedDocument[];
+  cases?: ClientCase[];
+  interactions?: Interaction[];
+  documents?: SharedDocument[];
 }
 
 // ─── Mock Data ────────────────────────────────────────────────────
-const clients: Client[] = [
-  {
-    id: 1, name: 'Khan Industries Ltd.', contact: 'Imran Khan', cnic: '35202-1234567-1',
-    email: 'imran@khanindustries.pk', phone: '+92 300 1234567', whatsapp: '+92 300 1234567',
-    city: 'Lahore', address: '45-A, Gulberg III, Lahore', activeCases: 3, totalBilled: '₨ 2.4M',
-    outstandingBalance: '₨ 380K', status: 'Active', vip: true,
-    tags: ['Corporate', 'Property', 'High Value'],
-    dateOnboarded: '2023-03-15', lastContact: '2025-03-25', retentionAlert: false, portalEnabled: true,
-    cases: [
-      { id: 'c1', title: 'Khan Industries v. Tax Authority', caseNumber: 'WP-2024-1122', court: 'Lahore High Court', status: 'Active', nextHearing: '2025-04-02' },
-      { id: 'c2', title: 'Property Dispute — DHA Phase 6', caseNumber: 'CS-2023-4455', court: 'Civil Court Lahore', status: 'Active', nextHearing: '2025-04-10' },
-      { id: 'c3', title: 'Khan Industries v. Supplier Corp.', caseNumber: 'CS-2024-7890', court: 'District Court Lahore', status: 'Active', nextHearing: '2025-04-15' },
-    ],
-    interactions: [
-      { id: 'i1', type: 'call', summary: 'Discussed tax case strategy and timeline for High Court hearing', date: '2025-03-25', time: '10:30 AM', duration: '18 min' },
-      { id: 'i2', type: 'meeting', summary: 'In-person meeting at office to review property documents for DHA case', date: '2025-03-20', time: '02:00 PM', duration: '45 min' },
-      { id: 'i3', type: 'whatsapp', summary: 'Shared court order copy and next hearing date confirmation', date: '2025-03-18', time: '04:15 PM' },
-      { id: 'i4', type: 'email', summary: 'Sent updated engagement letter for supplier dispute case', date: '2025-03-12', time: '11:00 AM' },
-    ],
-    documents: [
-      { id: 'd1', name: 'Engagement Letter — Tax Case.pdf', type: 'PDF', sharedDate: '2025-03-12', size: '245 KB' },
-      { id: 'd2', name: 'Court Order — 15 Mar 2025.pdf', type: 'PDF', sharedDate: '2025-03-18', size: '189 KB' },
-      { id: 'd3', name: 'Property Title Deed.pdf', type: 'PDF', sharedDate: '2025-02-28', size: '1.2 MB' },
-    ],
-  },
-  {
-    id: 2, name: 'Fatima Enterprises', contact: 'Fatima Bibi', cnic: '42101-9876543-2',
-    email: 'fatima@fatimaent.pk', phone: '+92 321 9876543', whatsapp: '+92 321 9876543',
-    city: 'Karachi', address: '12-B, PECHS Block 6, Karachi', activeCases: 1, totalBilled: '₨ 890K',
-    outstandingBalance: '₨ 120K', status: 'Active', vip: false,
-    tags: ['Corporate', 'Labour Law'],
-    dateOnboarded: '2024-01-10', lastContact: '2025-03-22', retentionAlert: false, portalEnabled: false,
-    cases: [
-      { id: 'c4', title: 'Fatima Enterprises v. Labour Union', caseNumber: 'ICA-2024-3344', court: 'NIRC Karachi', status: 'Active', nextHearing: '2025-04-08' },
-    ],
-    interactions: [
-      { id: 'i5', type: 'call', summary: 'Briefed on labour tribunal progress and settlement options', date: '2025-03-22', time: '03:00 PM', duration: '12 min' },
-      { id: 'i6', type: 'email', summary: 'Sent hearing notice and preparation checklist', date: '2025-03-15', time: '09:30 AM' },
-    ],
-    documents: [
-      { id: 'd4', name: 'Labour Dispute Filing.pdf', type: 'PDF', sharedDate: '2024-02-10', size: '320 KB' },
-    ],
-  },
-  {
-    id: 3, name: 'Ali Raza (Individual)', contact: 'Ali Raza', cnic: '61101-4567890-3',
-    email: 'ali.raza@gmail.com', phone: '+92 333 4567890', whatsapp: '+92 333 4567890',
-    city: 'Islamabad', address: 'House 45, Street 12, F-8/3, Islamabad', activeCases: 1, totalBilled: '₨ 450K',
-    outstandingBalance: '₨ 0', status: 'Active', vip: false,
-    tags: ['Criminal', 'Individual'],
-    dateOnboarded: '2024-06-20', lastContact: '2025-02-10', retentionAlert: true, portalEnabled: false,
-    cases: [
-      { id: 'c5', title: 'State v. Ali Raza', caseNumber: 'FIR-2024-1567', court: 'Sessions Court Islamabad', status: 'Active', nextHearing: '2025-04-05' },
-    ],
-    interactions: [
-      { id: 'i7', type: 'meeting', summary: 'Initial consultation regarding FIR and bail application strategy', date: '2024-06-20', time: '11:00 AM', duration: '60 min' },
-      { id: 'i8', type: 'call', summary: 'Follow-up on bail grant and next steps', date: '2025-02-10', time: '05:00 PM', duration: '8 min' },
-    ],
-    documents: [],
-  },
-  {
-    id: 4, name: 'Noor Enterprises', contact: 'Ahmed Noor', cnic: '42201-3456789-4',
-    email: 'ahmed@noorent.pk', phone: '+92 312 3456789', whatsapp: '+92 312 3456789',
-    city: 'Karachi', address: '88-C, Clifton Block 5, Karachi', activeCases: 1, totalBilled: '₨ 1.1M',
-    outstandingBalance: '₨ 250K', status: 'Active', vip: true,
-    tags: ['Corporate', 'Banking', 'High Value'],
-    dateOnboarded: '2022-09-01', lastContact: '2025-03-28', retentionAlert: false, portalEnabled: true,
-    cases: [
-      { id: 'c6', title: 'Noor Enterprises v. National Bank', caseNumber: 'BCA-2023-8899', court: 'Banking Court Karachi', status: 'Active', nextHearing: '2025-04-12' },
-    ],
-    interactions: [
-      { id: 'i9', type: 'whatsapp', summary: 'Confirmed next hearing date and document requirements', date: '2025-03-28', time: '09:00 AM' },
-      { id: 'i10', type: 'meeting', summary: 'Board meeting to discuss litigation strategy for banking case', date: '2025-03-20', time: '10:00 AM', duration: '90 min' },
-    ],
-    documents: [
-      { id: 'd5', name: 'Bank Statement Analysis.xlsx', type: 'Excel', sharedDate: '2025-03-20', size: '890 KB' },
-      { id: 'd6', name: 'Written Statement — Banking Court.pdf', type: 'PDF', sharedDate: '2025-01-15', size: '456 KB' },
-    ],
-  },
-  {
-    id: 5, name: 'Pakistan Workers Union', contact: 'Rashid Mehmood', cnic: '33100-6789012-5',
-    email: 'rashid@pwu.org.pk', phone: '+92 345 6789012', whatsapp: '+92 345 6789012',
-    city: 'Faisalabad', address: 'Office 3, Labour Colony, Faisalabad', activeCases: 1, totalBilled: '₨ 320K',
-    outstandingBalance: '₨ 80K', status: 'Active', vip: false,
-    tags: ['Labour Law', 'NGO'],
-    dateOnboarded: '2024-08-05', lastContact: '2025-03-10', retentionAlert: false, portalEnabled: false,
-    cases: [
-      { id: 'c7', title: 'PWU v. Textile Mills Association', caseNumber: 'LCA-2024-5566', court: 'Labour Court Faisalabad', status: 'Active', nextHearing: '2025-04-18' },
-    ],
-    interactions: [
-      { id: 'i11', type: 'call', summary: 'Discussed labour court proceedings and witness preparation', date: '2025-03-10', time: '02:30 PM', duration: '22 min' },
-    ],
-    documents: [],
-  },
-  {
-    id: 6, name: 'Islamabad Realty Corp.', contact: 'Shahid Ali', cnic: '61101-1234567-6',
-    email: 'shahid@isbrealty.pk', phone: '+92 302 1234567', whatsapp: '+92 302 1234567',
-    city: 'Islamabad', address: 'Blue Area, Jinnah Avenue, Islamabad', activeCases: 0, totalBilled: '₨ 1.8M',
-    outstandingBalance: '₨ 0', status: 'Inactive', vip: true,
-    tags: ['Property', 'Corporate', 'High Value'],
-    dateOnboarded: '2021-11-20', lastContact: '2024-11-15', retentionAlert: true, portalEnabled: true,
-    cases: [
-      { id: 'c8', title: 'Realty Corp. v. CDA', caseNumber: 'WP-2022-3344', court: 'Islamabad High Court', status: 'Disposed', nextHearing: undefined },
-    ],
-    interactions: [
-      { id: 'i12', type: 'email', summary: 'Sent final invoice and case closure summary', date: '2024-11-15', time: '10:00 AM' },
-    ],
-    documents: [
-      { id: 'd7', name: 'Case Closure Summary.pdf', type: 'PDF', sharedDate: '2024-11-15', size: '340 KB' },
-    ],
-  },
-];
+
 
 const allTags = ['Corporate', 'Criminal', 'Property', 'Labour Law', 'Banking', 'Family Law', 'Individual', 'High Value', 'NGO'];
 
@@ -224,8 +114,8 @@ export default function ClientCRM() {
 
   // Invite/add client form state
   const [newClientData, setNewClientData] = useState({
-    name: '',
-    contact: '',
+    fullName: '',
+    contactPerson: '',
     cnic: '',
     email: '',
     phone: '',
@@ -233,31 +123,38 @@ export default function ClientCRM() {
     city: '',
     address: '',
     vip: false,
-    tags: [] as string[]
+    tags: [] as string[],
+    linkedCaseId: ''
   });
   const [addingClient, setAddingClient] = useState(false);
+  const [availableCases, setAvailableCases] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadClients() {
       try {
         setLoading(true);
-        const [clientsRes, statsRes] = await Promise.allSettled([
+        const [clientsRes, statsRes, casesRes] = await Promise.allSettled([
           api.getClients(),
-          api.getClientStats()
+          api.getClientStats(),
+          api.getCases({ limit: 100 })
         ]);
 
-        if (clientsRes.status === 'fulfilled' && clientsRes.value && clientsRes.value.length > 0) {
-          setClientList(clientsRes.value);
-        } else {
-          setClientList(clients);
+        if (clientsRes.status === 'fulfilled' && clientsRes.value) {
+          const fetchedData = clientsRes.value.data || clientsRes.value; // handle array or paginated object
+          setClientList(Array.isArray(fetchedData) ? fetchedData : []);
         }
 
         if (statsRes.status === 'fulfilled' && statsRes.value) {
           setClientStats(statsRes.value);
         }
+
+        if (casesRes.status === 'fulfilled' && casesRes.value) {
+          const fetchedCases = casesRes.value.data || casesRes.value;
+          setAvailableCases(Array.isArray(fetchedCases) ? fetchedCases : []);
+        }
       } catch (err) {
-        console.error("Failed to load secure CRM directory. Reverting to offline premium client view", err);
-        setClientList(clients);
+        console.error("Failed to load secure CRM directory.", err);
+        setClientList([]);
       } finally {
         setLoading(false);
       }
@@ -268,12 +165,18 @@ export default function ClientCRM() {
   const handleAddClient = async () => {
     try {
       setAddingClient(true);
-      await api.createClient(newClientData);
+      const createdClient = await api.createClient(newClientData);
+      
+      if (newClientData.linkedCaseId && newClientData.linkedCaseId !== 'none' && createdClient?.id) {
+        // Link the selected case to the new client
+        await api.updateCase(newClientData.linkedCaseId, { clientId: createdClient.id });
+      }
+      
       setShowAddClient(false);
       // Reset form
       setNewClientData({
-        name: '',
-        contact: '',
+        fullName: '',
+        contactPerson: '',
         cnic: '',
         email: '',
         phone: '',
@@ -281,12 +184,14 @@ export default function ClientCRM() {
         city: '',
         address: '',
         vip: false,
-        tags: []
+        tags: [],
+        linkedCaseId: ''
       });
       // Refresh list
-      const updatedList = await api.getClients();
-      if (updatedList && updatedList.length > 0) {
-        setClientList(updatedList);
+      const res = await api.getClients();
+      const updatedList = res.data || res;
+      if (updatedList) {
+        setClientList(Array.isArray(updatedList) ? updatedList : []);
       }
     } catch (err) {
       console.error("Failed to create client", err);
@@ -295,13 +200,49 @@ export default function ClientCRM() {
     }
   };
 
+  const handleClientClick = async (client: Client) => {
+    try {
+      // Show basic info immediately
+      setSelectedClient({ ...client, cases: [], interactions: [], documents: [] });
+      setDetailTab('overview');
+      // Fetch full details
+      const details = await api.getClientDetail(client.id);
+      if (details) {
+        setSelectedClient(prev => prev?.id === client.id ? { ...prev, ...details } : prev);
+      }
+    } catch (error) {
+      console.error("Failed to load client details", error);
+    }
+  };
+
+  const handleLogInteraction = async () => {
+    if (!selectedClient || !newInteraction.summary) return;
+    try {
+      setLoading(true);
+      const res = await api.logClientInteraction(selectedClient.id, newInteraction);
+      if (res) {
+        // Refresh details
+        const details = await api.getClientDetail(selectedClient.id);
+        if (details) {
+          setSelectedClient(prev => prev?.id === selectedClient.id ? { ...prev, ...details } : prev);
+        }
+        setShowLogInteraction(false);
+        setNewInteraction({ type: 'call', summary: '' });
+      }
+    } catch (err) {
+      console.error("Failed to log interaction", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Conflict check logic
   const conflictResults = useMemo(() => {
     if (!conflictQuery.trim()) return [];
     const q = conflictQuery.toLowerCase();
     return clientList.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      c.contact.toLowerCase().includes(q) ||
+      c.fullName.toLowerCase().includes(q) ||
+      c.contactPerson.toLowerCase().includes(q) ||
       c.cnic.includes(conflictQuery)
     );
   }, [conflictQuery, clientList]);
@@ -309,13 +250,13 @@ export default function ClientCRM() {
   // Filtered clients
   const filtered = useMemo(() => {
     return clientList.filter(c => {
-      const matchSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.contact.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      const matchSearch = c.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        c.contactPerson.toLowerCase().includes(searchQuery.toLowerCase()) ||
         c.cnic.includes(searchQuery);
       const matchTag = tagFilter === 'all' || c.tags.includes(tagFilter);
       if (tab === 'all') return matchSearch && matchTag;
       if (tab === 'vip') return matchSearch && matchTag && c.vip;
-      if (tab === 'retention') return matchSearch && matchTag && c.retentionAlert;
+      if (tab === 'retention') return matchSearch && matchTag && c.retentionFlagged;
       return matchSearch && matchTag && c.status.toLowerCase() === tab;
     });
   }, [searchQuery, tab, tagFilter, clientList]);
@@ -327,7 +268,7 @@ export default function ClientCRM() {
       total: clientList.length,
       active: clientList.filter(c => c.status === 'Active').length,
       vip: clientList.filter(c => c.vip).length,
-      retentionAlerts: clientList.filter(c => c.retentionAlert).length,
+      retentionAlerts: clientList.filter(c => c.retentionFlagged).length,
     };
   }, [clientList, clientStats]);
 
@@ -358,18 +299,18 @@ export default function ClientCRM() {
             </Button>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold font-sans text-foreground">{selectedClient.name}</h2>
+                <h2 className="text-lg font-semibold font-sans text-foreground">{selectedClient.fullName}</h2>
                 {selectedClient.vip && <Star className="h-4 w-4 text-gold fill-gold" />}
                 <Badge variant={selectedClient.status === 'Active' ? 'default' : 'secondary'} className="text-[10px] h-5">
                   {selectedClient.status}
                 </Badge>
-                {selectedClient.retentionAlert && (
+                {selectedClient.retentionFlagged && (
                   <Badge variant="destructive" className="text-[10px] h-5 gap-1">
                     <Bell className="h-2.5 w-2.5" /> Retention Alert
                   </Badge>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground font-sans">CNIC: {selectedClient.cnic} · Client since {new Date(selectedClient.dateOnboarded).toLocaleDateString('en-PK', { month: 'short', year: 'numeric' })}</p>
+              <p className="text-xs text-muted-foreground font-sans">CNIC: {selectedClient.cnic} · Client since {new Date(selectedClient.onboardedAt).toLocaleDateString('en-PK', { month: 'short', year: 'numeric' })}</p>
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" className="text-xs h-8 gap-1.5" onClick={() => setShowLogInteraction(true)}>
@@ -386,10 +327,10 @@ export default function ClientCRM() {
           {/* Quick Info Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: 'Active Cases', value: selectedClient.activeCases, icon: Briefcase, color: 'text-primary' },
+              { label: 'Active Cases', value: selectedClient.activeCasesCount, icon: Briefcase, color: 'text-primary' },
               { label: 'Total Billed', value: selectedClient.totalBilled, icon: CreditCard, color: 'text-green-600' },
               { label: 'Outstanding', value: selectedClient.outstandingBalance, icon: TrendingUp, color: selectedClient.outstandingBalance !== '₨ 0' ? 'text-destructive' : 'text-green-600' },
-              { label: 'Last Contact', value: new Date(selectedClient.lastContact).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' }), icon: Clock, color: 'text-muted-foreground' },
+              { label: 'Last Contact', value: new Date(selectedClient.lastContactDate).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' }), icon: Clock, color: 'text-muted-foreground' },
             ].map((s, i) => (
               <Card key={i} className="border-border/50">
                 <CardContent className="p-3">
@@ -583,7 +524,7 @@ export default function ClientCRM() {
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle className="font-sans text-base">Log Interaction</DialogTitle>
-                <DialogDescription className="text-xs font-sans">Record a call, meeting, or message with {selectedClient.contact}</DialogDescription>
+                <DialogDescription className="text-xs font-sans">Record a call, meeting, or message with {selectedClient.contactPerson}</DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
                 <div>
@@ -611,7 +552,7 @@ export default function ClientCRM() {
               </div>
               <DialogFooter>
                 <Button variant="outline" size="sm" className="text-xs" onClick={() => setShowLogInteraction(false)}>Cancel</Button>
-                <Button size="sm" className="text-xs bg-primary" onClick={() => setShowLogInteraction(false)}>Save Interaction</Button>
+                <Button size="sm" className="text-xs bg-primary" onClick={handleLogInteraction} disabled={!newInteraction.summary || loading}>Save Interaction</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -645,7 +586,7 @@ export default function ClientCRM() {
           { label: 'Total Clients', value: stats.total, icon: Users, color: 'text-primary' },
           { label: 'Active', value: stats.active, icon: UserCheck, color: 'text-green-600' },
           { label: 'VIP Clients', value: stats.vip, icon: Star, color: 'text-gold' },
-          { label: 'Retention Alerts', value: stats.retentionAlerts, icon: Bell, color: 'text-destructive' },
+          { label: 'Retention Alerts', value: stats.retentionFlaggeds, icon: Bell, color: 'text-destructive' },
         ].map((s, i) => (
           <Card key={i} className="border-border/50">
             <CardContent className="p-3">
@@ -695,8 +636,8 @@ export default function ClientCRM() {
           <TabsTrigger value="active" className="text-xs font-sans h-7">Active ({stats.active})</TabsTrigger>
           <TabsTrigger value="vip" className="text-xs font-sans h-7">VIP ({stats.vip})</TabsTrigger>
           <TabsTrigger value="retention" className="text-xs font-sans h-7">
-            {stats.retentionAlerts > 0 && <Bell className="h-3 w-3 mr-1 text-destructive" />}
-            Alerts ({stats.retentionAlerts})
+            {stats.retentionFlaggeds > 0 && <Bell className="h-3 w-3 mr-1 text-destructive" />}
+            Alerts ({stats.retentionFlaggeds})
           </TabsTrigger>
           <TabsTrigger value="inactive" className="text-xs font-sans h-7">Inactive</TabsTrigger>
         </TabsList>
@@ -708,26 +649,26 @@ export default function ClientCRM() {
           <Card
             key={client.id}
             className="border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group"
-            onClick={() => { setSelectedClient(client); setDetailTab('overview'); }}
+            onClick={() => handleClientClick(client)}
           >
             <CardContent className="p-4">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10 border-2 border-border">
                     <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold font-sans">
-                      {client.contact.split(' ').map(n => n[0]).join('')}
+                      {client.contactPerson.split(' ').map(n => n[0]).join('')}
                     </AvatarFallback>
                   </Avatar>
                   <div>
                     <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-semibold font-sans text-foreground">{client.name}</p>
+                      <p className="text-sm font-semibold font-sans text-foreground">{client.fullName}</p>
                       {client.vip && <Star className="h-3 w-3 text-gold fill-gold" />}
                     </div>
-                    <p className="text-[11px] text-muted-foreground font-sans">{client.contact}</p>
+                    <p className="text-[11px] text-muted-foreground font-sans">{client.contactPerson}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  {client.retentionAlert && (
+                  {client.retentionFlagged && (
                     <div className="h-6 w-6 rounded-full bg-destructive/10 flex items-center justify-center">
                       <Bell className="h-3 w-3 text-destructive" />
                     </div>
@@ -756,7 +697,7 @@ export default function ClientCRM() {
 
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/30">
                 <div className="flex items-center gap-3 text-[11px] font-sans">
-                  <span className="flex items-center gap-1"><Briefcase className="h-3 w-3" />{client.activeCases} cases</span>
+                  <span className="flex items-center gap-1"><Briefcase className="h-3 w-3" />{client.activeCasesCount} cases</span>
                   <span className="font-semibold text-foreground">{client.totalBilled}</span>
                 </div>
                 <div className="flex gap-1">
@@ -813,11 +754,11 @@ export default function ClientCRM() {
                         <CardContent className="p-3 flex items-center gap-3">
                           <Avatar className="h-8 w-8">
                             <AvatarFallback className="bg-destructive/10 text-destructive text-[10px] font-semibold">
-                              {c.contact.split(' ').map(n => n[0]).join('')}
+                              {c.contactPerson.split(' ').map(n => n[0]).join('')}
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="text-xs font-semibold font-sans">{c.name}</p>
+                            <p className="text-xs font-semibold font-sans">{c.fullName}</p>
                             <p className="text-[10px] text-muted-foreground font-sans">CNIC: {c.cnic} · {c.city}</p>
                           </div>
                         </CardContent>
@@ -850,11 +791,11 @@ export default function ClientCRM() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs font-sans font-medium text-foreground mb-1 block">Full Name / Company *</label>
-                <Input value={newClientData.name} onChange={e => setNewClientData({...newClientData, name: e.target.value})} placeholder="e.g., Khan Industries Ltd." className="h-9 text-xs font-sans" />
+                <Input value={newClientData.fullName} onChange={e => setNewClientData({...newClientData, fullName: e.target.value})} placeholder="e.g., Khan Industries Ltd." className="h-9 text-xs font-sans" />
               </div>
               <div>
                 <label className="text-xs font-sans font-medium text-foreground mb-1 block">Contact Person *</label>
-                <Input value={newClientData.contact} onChange={e => setNewClientData({...newClientData, contact: e.target.value})} placeholder="e.g., Imran Khan" className="h-9 text-xs font-sans" />
+                <Input value={newClientData.contactPerson} onChange={e => setNewClientData({...newClientData, contactPerson: e.target.value})} placeholder="e.g., Imran Khan" className="h-9 text-xs font-sans" />
               </div>
             </div>
             <div>
@@ -929,7 +870,7 @@ export default function ClientCRM() {
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" className="text-xs" onClick={() => setShowAddClient(false)}>Cancel</Button>
-            <Button size="sm" className="text-xs bg-primary gap-1.5" onClick={handleAddClient} disabled={addingClient || !newClientData.name || !newClientData.contact}>
+            <Button size="sm" className="text-xs bg-primary gap-1.5" onClick={handleAddClient} disabled={addingClient || !newClientData.fullName || !newClientData.contactPerson}>
               {addingClient && <Loader2 className="h-3 w-3 animate-spin" />} Create Client
             </Button>
           </DialogFooter>

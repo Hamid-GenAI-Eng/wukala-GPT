@@ -168,12 +168,16 @@ export default function HearingCalendar() {
     try {
       const res = await api.getCalendarFeed({ view, date: currentDate.toISOString().split('T')[0] });
       if (res && res.items) {
-        const mapped: Hearing[] = res.items.map((h: any) => ({
+        const mapped: Hearing[] = res.items.map((h: any) => {
+          const rawCourtType = (h.courtType || 'district').toLowerCase();
+          const safeCourtType = ['district', 'high', 'supreme', 'tribunal'].includes(rawCourtType) ? rawCourtType as CourtType : 'district';
+          
+          return {
           id: h.id,
           caseTitle: h.caseTitle || 'Unknown Case',
           caseNumber: h.caseNumber || '',
           court: h.courtName || '',
-          courtType: (h.courtType || 'district').toLowerCase() as CourtType,
+          courtType: safeCourtType,
           courtroom: h.courtRoom || '',
           judge: h.judgeName || '',
           time: h.startTime || '',
@@ -184,7 +188,8 @@ export default function HearingCalendar() {
           priority: (h.priority || 'medium').toLowerCase() as any,
           client: h.clientName || 'Unknown Client',
           notes: h.notes
-        }));
+          };
+        });
         setHearings(mapped);
       }
     } catch (err: any) {

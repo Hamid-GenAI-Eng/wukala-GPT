@@ -478,7 +478,7 @@ export default function CaseManagement() {
     async function loadClients() {
       try {
         const res = await api.getClients();
-        const clientList = Array.isArray(res) ? res : (res?.items || res?.Items || []);
+        const clientList = Array.isArray(res) ? res : (res?.data || res?.Data || res?.items || res?.Items || []);
         setClients(clientList);
       } catch (err) {
         console.error("Failed to load clients dropdown", err);
@@ -1828,8 +1828,10 @@ export default function CaseManagement() {
         initialDate={editCaseData?.nextDate}
         onSuccess={() => {
           loadCasesList();
-          if (editCaseData?.id) {
+          if (editCaseData) {
+            // Need to reload case details if we are editing
             loadCaseDetails(editCaseData.id);
+            setEditCaseData({ ...editCaseData, nextDate: editCaseData.nextDate || new Date().toISOString() }); // Optimistic UI update or fetch from newHearing
           }
         }}
       />

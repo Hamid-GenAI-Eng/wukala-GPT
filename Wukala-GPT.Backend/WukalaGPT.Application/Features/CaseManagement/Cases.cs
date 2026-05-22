@@ -232,6 +232,7 @@ public class UpdateCaseCommand : IRequest<CaseDto>
     public string? Title { get; set; }
     public string? CaseNumber { get; set; }
     public string? FirNumber { get; set; }
+    public Guid? ClientId { get; set; }
     public string? ClientNameRaw { get; set; }
     public string? CourtName { get; set; }
     public string? CaseType { get; set; }
@@ -270,6 +271,9 @@ public class UpdateCaseCommandHandler : IRequestHandler<UpdateCaseCommand, CaseD
 
         if (request.FirNumber != null)
             caseEntity.FirNumber = request.FirNumber;
+
+        if (request.ClientId.HasValue)
+            caseEntity.ClientId = request.ClientId.Value;
 
         if (!string.IsNullOrEmpty(request.ClientNameRaw))
             caseEntity.ClientNameRaw = request.ClientNameRaw;

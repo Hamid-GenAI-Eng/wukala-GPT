@@ -19,10 +19,10 @@ interface AddHearingDialogProps {
 }
 
 const courtColors: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  high: { bg: 'bg-primary/10', text: 'text-primary', dot: 'bg-primary', label: 'High Court' },
-  sessions: { bg: 'bg-secondary', text: 'text-foreground', dot: 'bg-foreground/40', label: 'Sessions Court' },
-  civil: { bg: 'bg-accent', text: 'text-accent-foreground', dot: 'bg-accent-foreground/50', label: 'Civil Court' },
-  special: { bg: 'bg-warning/10', text: 'text-warning', dot: 'bg-warning', label: 'Special Court' },
+  district: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500', label: 'District Court' },
+  high: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', label: 'High Court' },
+  supreme: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500', label: 'Supreme Court' },
+  tribunal: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500', label: 'Tribunal' },
 };
 
 export function AddHearingDialog({ open, onOpenChange, cases, initialCaseId, initialDate, onSuccess }: AddHearingDialogProps) {
@@ -31,7 +31,7 @@ export function AddHearingDialog({ open, onOpenChange, cases, initialCaseId, ini
     hearingDate: initialDate || '',
     startTime: '09:00',
     courtName: '',
-    courtType: 'civil',
+    courtType: 'district',
     courtRoom: '',
     judgeName: '',
     hearingType: 'Hearing',

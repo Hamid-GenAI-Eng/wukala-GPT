@@ -92,6 +92,7 @@ public class GetCaseDetailsQueryHandler : IRequestHandler<GetCaseDetailsQuery, C
         // SECURE & FAST: Use AsNoTracking and SplitQueries for large relational pulls
         var caseEntity = await _context.LegalCases
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(c => c.TimelineEvents)
             .Include(c => c.Notes) // Fetch all notes, filter securely in-memory below to avoid EF Core translation failure
             .Include(c => c.Assignments)
