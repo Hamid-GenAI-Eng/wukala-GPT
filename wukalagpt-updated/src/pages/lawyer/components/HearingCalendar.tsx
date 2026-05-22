@@ -1,4 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import api from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -96,23 +98,7 @@ const statusConfig: Record<HearingStatus, { bg: string; text: string; label: str
 
 // ── Sample Data (auto-populated from cases) ────────────────────────
 const today = new Date();
-const makeDate = (offset: number, h = 10, m = 0) => {
-  const d = new Date(today);
-  d.setDate(d.getDate() + offset);
-  d.setHours(h, m, 0, 0);
-  return d;
-};
-
-const initialHearings: Hearing[] = [
-  { id: 1, caseTitle: 'Khan Industries v. FBR', caseNumber: '2024-CL-1847', court: 'Lahore High Court', courtType: 'high', courtroom: 'Court 3', time: '10:00 AM', endTime: '11:30 AM', date: makeDate(0, 10), type: 'Arguments', status: 'scheduled', priority: 'high', judge: 'Justice Malik Shahzad', client: 'Khan Industries (Pvt.) Ltd.' },
-  { id: 2, caseTitle: 'State v. Ali Raza', caseNumber: '2024-CR-0392', court: 'Sessions Court, Islamabad', courtType: 'district', courtroom: 'Court 7', time: '10:30 AM', endTime: '12:00 PM', date: makeDate(0, 10, 30), type: 'Evidence', status: 'scheduled', priority: 'critical', judge: 'Judge Farooq Ahmed', client: 'Ali Raza' },
-  { id: 3, caseTitle: 'Fatima Enterprises v. NBP', caseNumber: '2024-BK-0156', court: 'Banking Court, Lahore', courtType: 'tribunal', courtroom: 'Court 1', time: '2:00 PM', endTime: '3:30 PM', date: makeDate(1, 14), type: 'Hearing', status: 'scheduled', priority: 'medium', judge: 'Judge Rizwan Ul Haq', client: 'Fatima Enterprises' },
-  { id: 4, caseTitle: 'Noor Enterprises Dispute', caseNumber: '2024-CV-0781', court: 'Civil Court, Karachi', courtType: 'district', courtroom: 'Court 12', time: '9:30 AM', endTime: '11:00 AM', date: makeDate(3, 9, 30), type: 'Discovery', status: 'scheduled', priority: 'medium', judge: 'Justice Aisha Siddiqui', client: 'Noor Enterprises' },
-  { id: 5, caseTitle: 'Workers Union CBE', caseNumber: '2024-LB-0045', court: 'Labour Court, Faisalabad', courtType: 'tribunal', courtroom: 'Court 2', time: '11:00 AM', endTime: '12:30 PM', date: makeDate(5, 11), type: 'Mediation', status: 'scheduled', priority: 'low', judge: 'Judge Tariq Mehmood', client: 'CBE Workers Union' },
-  { id: 6, caseTitle: 'Govt. of Punjab v. Ahmad Group', caseNumber: '2024-SC-0089', court: 'Supreme Court of Pakistan', courtType: 'supreme', courtroom: 'Court 1', time: '11:00 AM', endTime: '1:00 PM', date: makeDate(2, 11), type: 'Constitutional Petition', status: 'scheduled', priority: 'critical', judge: 'CJP Isa', client: 'Ahmad Group of Companies' },
-  { id: 7, caseTitle: 'Rehman Property Dispute', caseNumber: '2024-CV-1102', court: 'Civil Court, Lahore', courtType: 'district', courtroom: 'Court 5', time: '2:00 PM', endTime: '3:00 PM', date: makeDate(0, 14), type: 'Arguments', status: 'adjourned', priority: 'medium', judge: 'Judge Saima Batool', client: 'Abdul Rehman', adjournmentReason: 'Judge on leave', nextDate: makeDate(7, 14) },
-  { id: 8, caseTitle: 'Tax Appeal — Textile Mills', caseNumber: '2024-TX-0234', court: 'Appellate Tribunal, Lahore', courtType: 'tribunal', courtroom: 'Bench A', time: '10:00 AM', endTime: '11:30 AM', date: makeDate(1, 10), type: 'Tax Appeal', status: 'scheduled', priority: 'high', judge: 'Member Judicial — Naveed', client: 'Faisal Textile Mills' },
-];
+// ── No Sample Data ────────────────────────
 
 // ── Utilities ──────────────────────────────────────────────────────
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -161,9 +147,12 @@ const HOURS = Array.from({ length: 12 }, (_, i) => i + 8); // 8 AM to 7 PM
 
 // ── Main Component ─────────────────────────────────────────────────
 export default function HearingCalendar() {
-  const [hearings, setHearings] = useState<Hearing[]>(initialHearings);
+  const { toast } = useToast();
+  const [hearings, setHearings] = useState<Hearing[]>([]);
+  const [cases, setCases] = useState<any[]>([]);
   const [view, setView] = useState<CalendarView>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
+  
   const [selectedHearing, setSelectedHearing] = useState<Hearing | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showAdjournDialog, setShowAdjournDialog] = useState(false);
@@ -173,6 +162,49 @@ export default function HearingCalendar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [courtFilter, setCourtFilter] = useState<CourtType | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
+
+  const loadHearings = async () => {
+    try {
+      const res = await api.getCalendarFeed({ view, date: currentDate.toISOString().split('T')[0] });
+      if (res && res.items) {
+        const mapped: Hearing[] = res.items.map((h: any) => ({
+          id: h.id,
+          caseTitle: h.caseTitle || 'Unknown Case',
+          caseNumber: h.caseNumber || '',
+          court: h.courtName || '',
+          courtType: (h.courtType || 'district').toLowerCase() as CourtType,
+          courtroom: h.courtRoom || '',
+          judge: h.judgeName || '',
+          time: h.startTime || '',
+          endTime: h.endTime || '',
+          date: new Date(h.hearingDate),
+          type: h.hearingType || 'Hearing',
+          status: (h.status || 'scheduled').toLowerCase() as HearingStatus,
+          priority: (h.priority || 'medium').toLowerCase() as any,
+          client: h.clientName || 'Unknown Client',
+          notes: h.notes
+        }));
+        setHearings(mapped);
+      }
+    } catch (err: any) {
+      console.error("Failed to load hearings", err);
+      toast({ variant: "destructive", title: "Error", description: err.message || "Failed to load hearings" });
+    }
+  };
+
+  const loadCases = async () => {
+    try {
+      const res = await api.getCases(1, 1000);
+      if (res && res.items) setCases(res.items);
+    } catch (err) {
+      console.error("Failed to load cases", err);
+    }
+  };
+
+  useEffect(() => {
+    loadHearings();
+    loadCases();
+  }, [view, currentDate]);
 
   // ── Conflicts ──────────────────────────────────────────────────
   const conflicts = useMemo(() => {
@@ -221,31 +253,43 @@ export default function HearingCalendar() {
   };
 
   // ── Adjournment ────────────────────────────────────────────────
-  const handleAdjourn = () => {
+  const handleAdjourn = async () => {
     if (!adjournTarget || !adjournReason) return;
-    setHearings(prev => prev.map(h => {
-      if (h.id === adjournTarget.id) {
-        return { ...h, status: 'adjourned' as HearingStatus, adjournmentReason: adjournReason, nextDate: adjournNextDate ? new Date(adjournNextDate) : undefined };
-      }
-      return h;
-    }));
-    if (adjournNextDate) {
-      const nd = new Date(adjournNextDate);
-      const newHearing: Hearing = {
-        ...adjournTarget,
-        id: Date.now(),
-        date: nd,
-        status: 'scheduled',
-        adjournmentReason: undefined,
-        nextDate: undefined,
-        notes: `Adjourned from ${adjournTarget.date.toLocaleDateString()}. Reason: ${adjournReason}`,
-      };
-      setHearings(prev => [...prev, newHearing]);
+    try {
+      await api.adjournHearing(adjournTarget.id.toString(), {
+        reason: adjournReason,
+        newDate: adjournNextDate ? adjournNextDate : undefined,
+        newTime: undefined // could add new time if needed
+      });
+      toast({ title: "Adjourned", description: "Hearing adjourned successfully." });
+      setShowAdjournDialog(false);
+      setAdjournTarget(null);
+      setAdjournReason('');
+      setAdjournNextDate('');
+      loadHearings();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Error", description: err.message });
     }
-    setShowAdjournDialog(false);
-    setAdjournTarget(null);
-    setAdjournReason('');
-    setAdjournNextDate('');
+  };
+
+  const handleComplete = async (id: number) => {
+    try {
+      await api.completeHearing(id.toString(), { notes: "Completed via calendar" });
+      toast({ title: "Completed", description: "Hearing marked as completed." });
+      loadHearings();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Error", description: err.message });
+    }
+  };
+
+  const handleCancel = async (id: number) => {
+    try {
+      await api.cancelHearing(id.toString(), { reason: "Cancelled via calendar" });
+      toast({ title: "Cancelled", description: "Hearing cancelled." });
+      loadHearings();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Error", description: err.message });
+    }
   };
 
   // ── Get hearings for a date ────────────────────────────────────
@@ -257,6 +301,51 @@ export default function HearingCalendar() {
     const diff = (h.date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
     return diff >= 0 && diff < 7 && h.status === 'scheduled';
   });
+
+  const [newHearing, setNewHearing] = useState({
+    caseId: '',
+    hearingDate: '',
+    startTime: '',
+    courtName: '',
+    courtType: '',
+    courtRoom: '',
+    judgeName: '',
+    hearingType: '',
+    priority: '',
+    notes: '',
+    durationMins: 60
+  });
+
+  const handleAddHearing = async () => {
+    try {
+      if (!newHearing.caseId || !newHearing.hearingDate || !newHearing.startTime || !newHearing.courtName || !newHearing.courtType) {
+        toast({ variant: "destructive", title: "Missing Fields", description: "Please fill in all required fields." });
+        return;
+      }
+      
+      const payload = {
+        ...newHearing,
+        courtRoom: newHearing.courtRoom || undefined,
+        judgeName: newHearing.judgeName || undefined,
+        hearingType: newHearing.hearingType || undefined,
+        priority: newHearing.priority || undefined,
+        notes: newHearing.notes || undefined
+      };
+
+      await api.createHearing(payload);
+      toast({ title: "Success", description: "Hearing scheduled successfully." });
+      setShowAddDialog(false);
+      
+      // Reset form
+      setNewHearing({
+        caseId: '', hearingDate: '', startTime: '', courtName: '', courtType: '',
+        courtRoom: '', judgeName: '', hearingType: '', priority: '', notes: '', durationMins: 60
+      });
+      loadHearings();
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Error", description: err.message });
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -672,14 +761,32 @@ export default function HearingCalendar() {
               </div>
               <div className="border-t border-border px-5 py-3 flex items-center gap-2">
                 {selectedHearing.status === 'scheduled' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs font-sans gap-1.5 text-warning border-warning/30 hover:bg-warning/10"
-                    onClick={() => { setAdjournTarget(selectedHearing); setShowAdjournDialog(true); setSelectedHearing(null); }}
-                  >
-                    <RotateCcw className="h-3 w-3" /> Mark Adjourned
-                  </Button>
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs font-sans gap-1.5 text-warning border-warning/30 hover:bg-warning/10"
+                      onClick={() => { setAdjournTarget(selectedHearing); setShowAdjournDialog(true); setSelectedHearing(null); }}
+                    >
+                      <RotateCcw className="h-3 w-3" /> Adjourn
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs font-sans gap-1.5 text-success border-success/30 hover:bg-success/10"
+                      onClick={() => { handleComplete(selectedHearing.id); setSelectedHearing(null); }}
+                    >
+                      <Gavel className="h-3 w-3" /> Complete
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs font-sans gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10"
+                      onClick={() => { handleCancel(selectedHearing.id); setSelectedHearing(null); }}
+                    >
+                      <X className="h-3 w-3" /> Cancel
+                    </Button>
+                  </>
                 )}
                 <Button variant="outline" size="sm" className="text-xs font-sans gap-1.5">
                   <Bell className="h-3 w-3" /> Set Reminder
@@ -743,26 +850,26 @@ export default function HearingCalendar() {
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 space-y-1.5">
                 <Label className="text-xs font-sans">Link to Case *</Label>
-                <Select>
+                <Select value={newHearing.caseId} onValueChange={(val) => setNewHearing({ ...newHearing, caseId: val })}>
                   <SelectTrigger className="text-xs font-sans h-9"><SelectValue placeholder="Select case file..." /></SelectTrigger>
                   <SelectContent>
-                    {initialHearings.map(h => (
-                      <SelectItem key={h.id} value={h.caseNumber} className="text-xs font-sans">{h.caseTitle} ({h.caseNumber})</SelectItem>
+                    {cases.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id} className="text-xs font-sans">{c.title} ({c.caseNumber})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Hearing Date *</Label>
-                <Input type="date" className="text-xs font-sans h-9" />
+                <Input type="date" className="text-xs font-sans h-9" value={newHearing.hearingDate} onChange={e => setNewHearing({ ...newHearing, hearingDate: e.target.value })} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Time *</Label>
-                <Input type="time" className="text-xs font-sans h-9" />
+                <Input type="time" className="text-xs font-sans h-9" value={newHearing.startTime} onChange={e => setNewHearing({ ...newHearing, startTime: e.target.value })} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Court *</Label>
-                <Select>
+                <Select value={newHearing.courtName} onValueChange={(val) => setNewHearing({ ...newHearing, courtName: val })}>
                   <SelectTrigger className="text-xs font-sans h-9"><SelectValue placeholder="Select court..." /></SelectTrigger>
                   <SelectContent>
                     {['Lahore High Court', 'Sessions Court, Islamabad', 'Supreme Court of Pakistan', 'Civil Court, Lahore', 'Banking Court, Lahore', 'Labour Court, Faisalabad'].map(c => (
@@ -773,7 +880,7 @@ export default function HearingCalendar() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Court Type *</Label>
-                <Select>
+                <Select value={newHearing.courtType} onValueChange={(val) => setNewHearing({ ...newHearing, courtType: val })}>
                   <SelectTrigger className="text-xs font-sans h-9"><SelectValue placeholder="Select type..." /></SelectTrigger>
                   <SelectContent>
                     {Object.entries(courtColors).map(([k, v]) => (
@@ -786,15 +893,15 @@ export default function HearingCalendar() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Courtroom</Label>
-                <Input placeholder="e.g. Court 3" className="text-xs font-sans h-9" />
+                <Input placeholder="e.g. Court 3" className="text-xs font-sans h-9" value={newHearing.courtRoom} onChange={e => setNewHearing({ ...newHearing, courtRoom: e.target.value })} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Judge</Label>
-                <Input placeholder="Judge name" className="text-xs font-sans h-9" />
+                <Input placeholder="Judge name" className="text-xs font-sans h-9" value={newHearing.judgeName} onChange={e => setNewHearing({ ...newHearing, judgeName: e.target.value })} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Hearing Type</Label>
-                <Select>
+                <Select value={newHearing.hearingType} onValueChange={(val) => setNewHearing({ ...newHearing, hearingType: val })}>
                   <SelectTrigger className="text-xs font-sans h-9"><SelectValue placeholder="Type..." /></SelectTrigger>
                   <SelectContent>
                     {['Arguments', 'Evidence', 'Hearing', 'Discovery', 'Mediation', 'Constitutional Petition', 'Tax Appeal', 'Bail', 'Judgment'].map(t => (
@@ -805,7 +912,7 @@ export default function HearingCalendar() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Priority</Label>
-                <Select>
+                <Select value={newHearing.priority} onValueChange={(val) => setNewHearing({ ...newHearing, priority: val })}>
                   <SelectTrigger className="text-xs font-sans h-9"><SelectValue placeholder="Priority..." /></SelectTrigger>
                   <SelectContent>
                     {['critical', 'high', 'medium', 'low'].map(p => (
@@ -816,13 +923,13 @@ export default function HearingCalendar() {
               </div>
               <div className="col-span-2 space-y-1.5">
                 <Label className="text-xs font-sans">Notes</Label>
-                <Textarea placeholder="Any special instructions or preparation notes..." className="text-xs font-sans min-h-[60px]" />
+                <Textarea placeholder="Any special instructions or preparation notes..." className="text-xs font-sans min-h-[60px]" value={newHearing.notes} onChange={e => setNewHearing({ ...newHearing, notes: e.target.value })} />
               </div>
             </div>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" size="sm" className="text-xs font-sans" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-            <Button size="sm" className="text-xs font-sans bg-gradient-primary gap-1.5" onClick={() => setShowAddDialog(false)}>
+            <Button size="sm" className="text-xs font-sans bg-gradient-primary gap-1.5" onClick={handleAddHearing}>
               <Plus className="h-3 w-3" /> Schedule Hearing
             </Button>
           </DialogFooter>

@@ -305,12 +305,14 @@ export default function CaseManagement() {
     if (typeof statusStr === 'number') {
       const statusMap: Record<number, string> = {
         0: 'Filed',
-        1: 'NoticeIssued',
-        2: 'Pleaded',
-        3: 'Evidence',
-        4: 'Arguments',
-        5: 'Decided',
-        6: 'Closed'
+        1: 'Active',
+        2: 'Heard',
+        3: 'Reserved',
+        4: 'Decided',
+        5: 'Appeal',
+        6: 'Closed',
+        7: 'Discovery',
+        8: 'Negotiation'
       };
       statusStr = statusMap[statusStr] || 'Filed';
     } else if (typeof statusStr !== 'string') {
@@ -325,11 +327,11 @@ export default function CaseManagement() {
         1: 'Criminal',
         2: 'Corporate',
         3: 'Family',
-        4: 'Tax',
-        5: 'Labor',
-        6: 'IntellectualProperty',
+        4: 'Property',
+        5: 'Labour',
+        6: 'Tax',
         7: 'Constitutional',
-        8: 'Other'
+        8: 'Banking'
       };
       typeStr = typeMap[typeStr] || 'Civil';
     } else if (typeof typeStr !== 'string') {
@@ -340,10 +342,11 @@ export default function CaseManagement() {
     let priorityStr = c.priority;
     if (typeof priorityStr === 'number') {
       const priorityMap: Record<number, string> = {
-        0: 'Low',
-        1: 'Medium',
-        2: 'High',
-        3: 'Urgent'
+        0: 'Critical',
+        1: 'High',
+        2: 'Medium',
+        3: 'Normal',
+        4: 'Low'
       };
       priorityStr = priorityMap[priorityStr] || 'Medium';
     } else if (typeof priorityStr !== 'string') {
@@ -1030,7 +1033,7 @@ export default function CaseManagement() {
                   return (
                     <button
                       key={linkedId}
-                      onClick={() => { setSelectedCase(linked); setDetailTab('timeline'); }}
+                      onClick={() => { setDetailTab('timeline'); loadCaseDetails(linkedId); }}
                       className="flex items-center gap-2 px-3 py-2 rounded-lg bg-secondary/50 border border-border/30 hover:border-primary/30 hover:bg-primary/5 transition-all text-left"
                     >
                       <GitBranch className="h-3.5 w-3.5 text-primary" />
