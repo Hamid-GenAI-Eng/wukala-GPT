@@ -25,6 +25,12 @@ public class TeamController : ControllerBase
 
     private Guid GetFirmId()
     {
+        var claimValue = User.FindFirstValue("FirmId");
+        if (!string.IsNullOrEmpty(claimValue) && Guid.TryParse(claimValue, out var firmId))
+        {
+            return firmId;
+        }
+
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (Guid.TryParse(userIdString, out var userId))
         {
@@ -34,6 +40,7 @@ public class TeamController : ControllerBase
         
         throw new UnauthorizedAccessException("User is not associated with a firm.");
     }
+
 
     private Guid GetUserId()
     {

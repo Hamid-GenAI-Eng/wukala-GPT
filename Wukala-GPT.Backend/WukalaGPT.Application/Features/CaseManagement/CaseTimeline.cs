@@ -114,3 +114,100 @@ public class GetCaseTimelineQueryHandler : IRequestHandler<GetCaseTimelineQuery,
             .ToListAsync(cancellationToken);
     }
 }
+
+// ----------------------------------------------------
+// COMMAND: Update Timeline Event
+// ----------------------------------------------------
+public class UpdateTimelineEventCommand : IRequest<CaseTimelineEventDto>
+{
+    public Guid CaseId { get; set; }
+    public Guid EventId { get; set; }
+    public Guid RequesterUserId { get; set; }
+    public string? EventType { get; set; }
+    public string? Title { get; set; }
+    public string? Description { get; set; }
+    public DateTime? EventDate { get; set; }
+}
+
+public class UpdateTimelineEventCommandHandler : IRequestHandler<UpdateTimelineEventCommand, CaseTimelineEventDto>
+{
+    private readonly IApplicationDbContext _context;
+    private readonly ICaseUpdateService _caseUpdateService;
+
+    public UpdateTimelineEventCommandHandler(IApplicationDbContext context, ICaseUpdateService caseUpdateService)
+    {
+        _context = context;
+        _caseUpdateService = caseUpdateService;
+    }
+
+    public async Task<CaseTimelineEventDto> Handle(UpdateTimelineEventCommand request, CancellationToken cancellationToken)
+    {
+        var evt = await _context.CaseTimelineEvents.FirstOrDefaultAsync(t => t.Id == request.EventId && t.CaseId == request.CaseId, cancellationToken);
+        if (evt == null) throw new Exception("Event not found.");
+
+        if (!string.IsNullOrEmpty(request.EventType))
+        {
+            var rawEventType = request.EventType.Trim();
+            if (rawEventType.Equals("filing", StringComparison.OrdinalIgnoreCase))
+            {
+                rawEventType = "Filed";
+            }
+            if (Enum.TryParse<CaseEventType>(rawEventType, true, out var parsedEventType))
+            {
+                evt.EventType = parsedEventType;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(request.Title)) evt.Title = request.Title;
+        if (request.Description != null) evt.Description = request.Description;
+        if (request.EventDate.HasValue) evt.EventDate = request.EventDate.Value;
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        var dto = new CaseTimelineEventDto
+        {
+            Id = evt.Id,
+            EventType = evt.EventType,
+            Title = evt.Title,
+            Description = evt.Description,
+            EventDate = evt.EventDate,
+            CreatedAt = evt.CreatedAt
+        };
+
+        // Broadcast update
+        await _caseUpdateService.BroadcastTimelineEventAsync(request.CaseId, dto, cancellationToken);
+
+        return dto;
+    }
+}
+
+// ----------------------------------------------------
+// COMMAND: Delete Timeline Event
+// ----------------------------------------------------
+public class DeleteTimelineEventCommand : IRequest<bool>
+{
+    public Guid CaseId { get; set; }
+    public Guid EventId { get; set; }
+    public Guid RequesterUserId { get; set; }
+}
+
+public class DeleteTimelineEventCommandHandler : IRequestHandler<DeleteTimelineEventCommand, bool>
+{
+    private readonly IApplicationDbContext _context;
+
+    public DeleteTimelineEventCommandHandler(IApplicationDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<bool> Handle(DeleteTimelineEventCommand request, CancellationToken cancellationToken)
+    {
+        var evt = await _context.CaseTimelineEvents.FirstOrDefaultAsync(t => t.Id == request.EventId && t.CaseId == request.CaseId, cancellationToken);
+        if (evt == null) return false;
+
+        _context.CaseTimelineEvents.Remove(evt);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return true;
+    }
+}

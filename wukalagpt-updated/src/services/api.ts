@@ -118,6 +118,7 @@ async function request<T>(
       ...options,
       headers: { ...headers, ...options.headers },
       signal: controller.signal,
+      cache: 'no-store', // Prevent aggressive browser caching for GET requests
     });
 
     clearTimeout(timeoutId);
@@ -1046,6 +1047,19 @@ export const api = {
     return request<any>(`/Cases/${id}/timeline`, {
       method: 'POST',
       body: JSON.stringify(data),
+    }, true);
+  },
+
+  updateCaseTimelineEvent: async (id: string, eventId: string, data: any) => {
+    return request<any>(`/Cases/${id}/timeline/${eventId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  deleteCaseTimelineEvent: async (id: string, eventId: string) => {
+    return request<any>(`/Cases/${id}/timeline/${eventId}`, {
+      method: 'DELETE',
     }, true);
   },
 

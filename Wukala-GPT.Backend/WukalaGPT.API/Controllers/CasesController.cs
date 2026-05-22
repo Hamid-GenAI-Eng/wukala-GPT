@@ -5,6 +5,7 @@ using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using WukalaGPT.Application.Features.CaseManagement;
+using WukalaGPT.Application.Interfaces;
 
 namespace WukalaGPT.API.Controllers;
 
@@ -14,10 +15,12 @@ namespace WukalaGPT.API.Controllers;
 public class CasesController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IApplicationDbContext _context;
 
-    public CasesController(IMediator mediator)
+    public CasesController(IMediator mediator, IApplicationDbContext context)
     {
         _mediator = mediator;
+        _context = context;
     }
     
     private Guid GetUserId()
@@ -26,12 +29,29 @@ public class CasesController : ControllerBase
         return claim != null ? Guid.Parse(claim.Value) : Guid.Empty;
     }
 
+    private Guid GetFirmId()
+    {
+        var claimValue = User.FindFirstValue("FirmId");
+        if (!string.IsNullOrEmpty(claimValue) && Guid.TryParse(claimValue, out var firmId))
+        {
+            return firmId;
+        }
+
+        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (Guid.TryParse(userIdString, out var userId))
+        {
+            var user = _context.Users.Find(userId);
+            if (user?.FirmId != null) return user.FirmId.Value;
+        }
+        throw new UnauthorizedAccessException("User is not associated with any firm.");
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetCases([FromQuery] string? status, [FromQuery] string? type, [FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int limit = 20)
     {
         var result = await _mediator.Send(new GetCasesQuery
         {
-            Status = status, CaseType = type, Search = search, Page = page, Limit = limit
+            FirmId = GetFirmId(), Status = status, CaseType = type, Search = search, Page = page, Limit = limit
         });
         return Ok(result);
     }
@@ -82,6 +102,24 @@ public class CasesController : ControllerBase
         command.RequesterUserId = GetUserId();
         var result = await _mediator.Send(command);
         return Ok(result);
+    }
+
+    [HttpPatch("{id}/timeline/{eventId}")]
+    public async Task<IActionResult> UpdateTimelineEvent(Guid id, Guid eventId, [FromBody] UpdateTimelineEventCommand command)
+    {
+        command.CaseId = id;
+        command.EventId = eventId;
+        command.RequesterUserId = GetUserId();
+        var result = await _mediator.Send(command);
+        return Ok(result);
+    }
+
+    [HttpDelete("{id}/timeline/{eventId}")]
+    public async Task<IActionResult> DeleteTimelineEvent(Guid id, Guid eventId)
+    {
+        var success = await _mediator.Send(new DeleteTimelineEventCommand { CaseId = id, EventId = eventId, RequesterUserId = GetUserId() });
+        if (!success) return NotFound();
+        return NoContent();
     }
     
     // --- NOTES ---

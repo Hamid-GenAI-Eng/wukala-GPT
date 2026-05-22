@@ -27,6 +27,12 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             new Claim(ClaimTypes.Name, $"{user.FirstName} {user.LastName}")
         };
 
+        if (user.FirmId.HasValue)
+        {
+            claims.Add(new Claim("FirmId", user.FirmId.Value.ToString()));
+        }
+
+
         var secret = _config["JwtSettings:Secret"] ?? throw new InvalidOperationException("JWT Secret not found");
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);

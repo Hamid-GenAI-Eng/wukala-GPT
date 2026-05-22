@@ -24,8 +24,12 @@ public class AnalyticsController : ControllerBase
 
     private Guid GetFirmId()
     {
-        // For demonstration, retrieve FirmId stored in User context or identity claims.
-        // Implementing real identity token mappings would do this: 
+        var claimValue = User.FindFirstValue("FirmId");
+        if (!string.IsNullOrEmpty(claimValue) && Guid.TryParse(claimValue, out var firmId))
+        {
+            return firmId;
+        }
+
         var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (Guid.TryParse(userIdString, out var userId))
         {
@@ -35,6 +39,7 @@ public class AnalyticsController : ControllerBase
         
         throw new UnauthorizedAccessException("User is not associated with a firm.");
     }
+
 
     [HttpGet("overview")]
     public async Task<ActionResult<PracticeAnalyticsOverviewDto>> GetOverview([FromQuery] string period = "12m")

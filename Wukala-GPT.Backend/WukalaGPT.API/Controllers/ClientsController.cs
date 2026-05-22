@@ -6,6 +6,8 @@ using WukalaGPT.Application.Features.Clients;
 using WukalaGPT.Domain.Entities;
 using Hangfire;
 
+using WukalaGPT.Application.Interfaces;
+
 namespace WukalaGPT.API.Controllers;
 
 [Authorize]
@@ -14,10 +16,34 @@ namespace WukalaGPT.API.Controllers;
 public class ClientsController : ControllerBase
 {
     private readonly IMediator _mediator;
-    public ClientsController(IMediator mediator) => _mediator = mediator;
+    private readonly IApplicationDbContext _context;
 
-    private Guid GetFirmId() => Guid.Parse(User.FindFirstValue("FirmId") ?? Guid.Empty.ToString());
+    public ClientsController(IMediator mediator, IApplicationDbContext context)
+    {
+        _mediator = mediator;
+        _context = context;
+    }
+
+    private Guid GetFirmId()
+    {
+        var claimValue = User.FindFirstValue("FirmId");
+        if (!string.IsNullOrEmpty(claimValue) && Guid.TryParse(claimValue, out var firmId))
+        {
+            return firmId;
+        }
+
+        var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (Guid.TryParse(userIdString, out var userId))
+        {
+            var user = _context.Users.Find(userId);
+            if (user?.FirmId != null) return user.FirmId.Value;
+        }
+
+        throw new UnauthorizedAccessException("User is not associated with a firm.");
+    }
+
     private Guid GetUserId() => Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? Guid.Empty.ToString());
+
 
     [HttpGet]
     public async Task<IActionResult> GetClients([FromQuery] GetClientsQuery query)

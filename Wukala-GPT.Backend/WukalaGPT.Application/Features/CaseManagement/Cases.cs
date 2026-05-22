@@ -56,6 +56,7 @@ public class GetCasesQuery : IRequest<PaginatedList<CaseDto>>
     public string? Search { get; set; }
     public int Page { get; set; } = 1;
     public int Limit { get; set; } = 20;
+    public Guid FirmId { get; set; }
 }
 
 public class GetCasesQueryHandler : IRequestHandler<GetCasesQuery, PaginatedList<CaseDto>>
@@ -71,7 +72,7 @@ public class GetCasesQueryHandler : IRequestHandler<GetCasesQuery, PaginatedList
 
     public async Task<PaginatedList<CaseDto>> Handle(GetCasesQuery request, CancellationToken cancellationToken)
     {
-        string cacheKey = $"Cases_Page_{request.Page}_Limit_{request.Limit}_T_{request.CaseType}_S_{request.Status}_Search_{request.Search}";
+        string cacheKey = $"Cases_Firm_{request.FirmId}_Page_{request.Page}_Limit_{request.Limit}_T_{request.CaseType}_S_{request.Status}_Search_{request.Search}";
         var cachedData = await _cache.GetStringAsync(cacheKey, cancellationToken);
         
         if (!string.IsNullOrEmpty(cachedData))
@@ -79,7 +80,7 @@ public class GetCasesQueryHandler : IRequestHandler<GetCasesQuery, PaginatedList
             return JsonSerializer.Deserialize<PaginatedList<CaseDto>>(cachedData) ?? new PaginatedList<CaseDto>();
         }
 
-        var query = _context.LegalCases.AsNoTracking().Where(c => !c.IsArchived);
+        var query = _context.LegalCases.AsNoTracking().Where(c => !c.IsArchived && c.FirmId == request.FirmId);
 
         if (!string.IsNullOrEmpty(request.Status))
         {
@@ -139,8 +140,8 @@ public class GetCasesQueryHandler : IRequestHandler<GetCasesQuery, PaginatedList
             Limit = request.Limit
         };
 
-        // Cache the response securely for 5 minutes
-        var cacheOptions = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) };
+        // Cache the response securely for 30 seconds to ensure high data freshness for UI updates
+        var cacheOptions = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30) };
         await _cache.SetStringAsync(cacheKey, JsonSerializer.Serialize(result), cacheOptions, cancellationToken);
 
         return result;

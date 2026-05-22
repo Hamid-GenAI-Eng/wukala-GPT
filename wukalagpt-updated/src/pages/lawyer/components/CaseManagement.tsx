@@ -467,6 +467,56 @@ export default function CaseManagement() {
       rawTimeline = [...rawTimeline, ...localUnique];
     }
 
+    // Map status if number
+    let statusStr = c.status;
+    if (typeof statusStr === 'number') {
+      const statusMap: Record<number, string> = {
+        0: 'Filed',
+        1: 'NoticeIssued',
+        2: 'Pleaded',
+        3: 'Evidence',
+        4: 'Arguments',
+        5: 'Decided',
+        6: 'Closed'
+      };
+      statusStr = statusMap[statusStr] || 'Filed';
+    } else if (typeof statusStr !== 'string') {
+      statusStr = 'Filed';
+    }
+
+    // Map caseType if number
+    let typeStr = c.caseType || c.type;
+    if (typeof typeStr === 'number') {
+      const typeMap: Record<number, string> = {
+        0: 'Civil',
+        1: 'Criminal',
+        2: 'Corporate',
+        3: 'Family',
+        4: 'Tax',
+        5: 'Labor',
+        6: 'IntellectualProperty',
+        7: 'Constitutional',
+        8: 'Other'
+      };
+      typeStr = typeMap[typeStr] || 'Civil';
+    } else if (typeof typeStr !== 'string') {
+      typeStr = 'Civil';
+    }
+
+    // Map priority if number
+    let priorityStr = c.priority;
+    if (typeof priorityStr === 'number') {
+      const priorityMap: Record<number, string> = {
+        0: 'Low',
+        1: 'Medium',
+        2: 'High',
+        3: 'Urgent'
+      };
+      priorityStr = priorityMap[priorityStr] || 'Medium';
+    } else if (typeof priorityStr !== 'string') {
+      priorityStr = 'Medium';
+    }
+
     return {
       id: c.id,
       title: c.title || '',
@@ -477,21 +527,39 @@ export default function CaseManagement() {
       court: c.courtName || c.court || '',
       judge: c.judgeName || c.judge || '',
       opposingCounsel: c.opposingCounsel || '',
-      type: c.caseType || c.type || '',
-      priority: c.priority || 'Medium',
-      status: c.status || 'Active',
+      type: typeStr,
+      priority: priorityStr,
+      status: statusStr as CaseStatus,
       stage: c.stage || 'Initial filing',
       nextHearing: safeDateString(c.nextHearing || c.nextDate),
       filedDate: safeDateString(c.filedDate || c.filingDate),
       description: c.description || '',
       linkedCases: Array.isArray(c.linkedCases) ? c.linkedCases.map((l: any) => l.linkedCaseId || l) : (cached.linkedCases || []),
-      timeline: Array.isArray(rawTimeline) ? rawTimeline.map((t: any) => ({
-        id: t.id,
-        date: safeDateString(t.eventDate || t.createdAt || t.date || new Date()),
-        title: t.title || '',
-        description: t.description || '',
-        type: (t.eventType || t.type || 'Hearing').toLowerCase()
-      })) : [],
+      timeline: Array.isArray(rawTimeline) ? rawTimeline.map((t: any) => {
+        let rawType = t.eventType !== undefined && t.eventType !== null ? t.eventType : t.type;
+        if (typeof rawType === 'number') {
+          const eventTypeMap: Record<number, string> = {
+            0: 'Filed',
+            1: 'Hearing',
+            2: 'Adjournment',
+            3: 'Order',
+            4: 'Submission',
+            5: 'Document',
+            6: 'Note',
+            7: 'StatusChange',
+            8: 'Appeal'
+          };
+          rawType = eventTypeMap[rawType] || 'Hearing';
+        }
+        const finalType = typeof rawType === 'string' ? rawType : 'Hearing';
+        return {
+          id: t.id,
+          date: safeDateString(t.eventDate || t.createdAt || t.date || new Date()),
+          title: t.title || '',
+          description: t.description || '',
+          type: finalType.toLowerCase()
+        };
+      }) : [],
       notes: Array.isArray(rawNotes) ? rawNotes.map((n: any) => ({
         id: n.id,
         author: n.authorId === c.leadLawyerId || !n.authorId ? 'Lead Counsel' : 'Internal User',
@@ -844,6 +912,35 @@ export default function CaseManagement() {
     }
   };
 
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!selectedCase) return;
+    if (!confirm("Are you sure you want to delete this event from the timeline?")) return;
+    try {
+      await api.deleteCaseTimelineEvent(selectedCase.id, eventId);
+      toast({ title: "Event Deleted", description: "The timeline event has been removed." });
+      await loadCaseDetails(selectedCase.id);
+    } catch (err: any) {
+      console.error("Failed to delete event", err);
+      toast({
+        variant: "destructive",
+        title: "Deletion Failed",
+        description: err?.message || "Could not delete timeline event."
+      });
+    }
+  };
+
+  const handleDownloadDoc = (url: string, name: string) => {
+    // In a real implementation this would fetch the blob and trigger download
+    // For now we use the anchor download fallback
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
   const handleLinkCaseSubmit = async () => {
     if (!selectedCase || !linkTargetId) return;
     const targetId = linkTargetId;
@@ -1160,7 +1257,12 @@ export default function CaseManagement() {
                             <div className="pt-1 min-w-0 flex-1">
                               <div className="flex items-center justify-between gap-2">
                                 <p className="text-sm font-medium font-sans text-foreground">{event.title}</p>
-                                <span className="text-[10px] text-muted-foreground font-sans whitespace-nowrap">{event.date}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-muted-foreground font-sans whitespace-nowrap">{event.date}</span>
+                                  <Button variant="ghost" size="icon" className="h-5 w-5 text-destructive hover:bg-destructive/10" onClick={() => handleDeleteEvent(event.id)}>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
                               </div>
                               <p className="text-[11px] text-muted-foreground font-sans mt-0.5 leading-relaxed">{event.description}</p>
                             </div>
@@ -1213,9 +1315,14 @@ export default function CaseManagement() {
                           <div className="flex items-center gap-1 shrink-0">
                             <Badge variant="secondary" className="text-[9px] font-sans">{doc.type}</Badge>
                             {doc.url && (
-                              <a href={doc.url} target="_blank" rel="noopener noreferrer">
-                                <Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="h-3.5 w-3.5" /></Button>
-                              </a>
+                              <div className="flex gap-1">
+                                <a href={doc.url} target="_blank" rel="noopener noreferrer">
+                                  <Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="h-3.5 w-3.5" /></Button>
+                                </a>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadDoc(doc.url, doc.name)}>
+                                  <Download className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
                             )}
                           </div>
                         </div>

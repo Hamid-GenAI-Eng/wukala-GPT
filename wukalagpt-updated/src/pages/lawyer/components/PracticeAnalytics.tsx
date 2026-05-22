@@ -268,8 +268,8 @@ export default function PracticeAnalytics() {
         { label: 'Avg. Lifetime Value', value: '₨ 2.1M', icon: DollarSign, change: 'Per client' },
       ];
 
-  const dynamicHeatmapData = workloadData?.data && workloadData.data.length > 0
-    ? workloadData.data
+  const dynamicHeatmapData = workload?.data && workload.data.length > 0
+    ? workload.data
     : heatmapData;
 
   if (loading) {

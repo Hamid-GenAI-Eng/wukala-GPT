@@ -33,13 +33,23 @@ class BGEM3EmbeddingService:
         
         dense = embeddings['dense_vecs'][0].tolist()
         sparse_dict = embeddings['lexical_weights'][0]
-        # Convert dict {str(id): float} to indices and values list for Qdrant
-        indices = [int(k) for k in sparse_dict.keys()]
-        values = [float(v) for v in sparse_dict.values()]
+        # Convert dict {str(id): float} to indices and values list for Qdrant safely
+        indices = []
+        values = []
+        for k, v in sparse_dict.items():
+            try:
+                indices.append(int(k))
+                values.append(float(v))
+            except ValueError:
+                # Deterministic hash for string tokens to positive 32-bit int to prevent crash
+                hashed_idx = abs(hash(k)) % 2147483647
+                indices.append(hashed_idx)
+                values.append(float(v))
         
         return {
             "dense": dense,
             "sparse": {"indices": indices, "values": values}
         }
+
 
 embedding_service = BGEM3EmbeddingService()

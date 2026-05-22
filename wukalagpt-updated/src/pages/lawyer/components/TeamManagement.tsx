@@ -34,6 +34,8 @@ import {
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
+
 import {
   Dialog,
   DialogContent,
@@ -162,7 +164,9 @@ const tabList: { key: TabKey; label: string; icon: React.ElementType }[] = [
 const fadeIn = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -8 }, transition: { duration: 0.25 } };
 
 export default function TeamManagement() {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabKey>('members');
+
   const [inviteOpen, setInviteOpen] = useState(false);
   const [taskFilter, setTaskFilter] = useState<string>('all');
 
@@ -229,8 +233,17 @@ export default function TeamManagement() {
       if (updatedMembers && updatedMembers.length > 0) {
         setMembers(updatedMembers);
       }
-    } catch (err) {
+      toast({
+        title: "Success",
+        description: "Invitation sent successfully.",
+      });
+    } catch (err: any) {
       console.error("Failed to send invitation", err);
+      toast({
+        title: "Invitation Failed",
+        description: err?.message || "An unexpected error occurred while sending the invitation.",
+        variant: "destructive",
+      });
     } finally {
       setInviting(false);
     }

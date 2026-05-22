@@ -8,7 +8,12 @@ def retrieve_documents(state: GraphState):
         return {"context_documents": []}
         
     query = messages[-1].content
-    
+    if "[USER INPUT BEGIN]" in query:
+        try:
+            query = query.split("[USER INPUT BEGIN]")[1].split("[USER INPUT END]")[0].strip()
+        except Exception:
+            pass
+        
     # 1. Embed query
     vectors = embedding_service.embed_text(query)
     
@@ -29,8 +34,10 @@ def retrieve_documents(state: GraphState):
         
         formatted_doc = {
             "source": f"{citation} - {court}",
+            "citation": citation,
             "content": text
         }
         context_docs.append(formatted_doc)
         
     return {"context_documents": context_docs}
+
