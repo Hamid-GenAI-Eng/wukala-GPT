@@ -5,6 +5,8 @@ using System;
 using System.Threading.Tasks;
 using WukalaGPT.Application.Features.Hearings.CQRS;
 
+using System.Security.Claims;
+
 namespace WukalaGPT.API.Controllers;
 
 [ApiController]
@@ -19,8 +21,17 @@ public class HearingsController : ControllerBase
         _mediator = mediator;
     }
 
-    private Guid GetFirmId() => Guid.Parse(User.FindFirst("FirmId")!.Value);
-    private Guid GetUserId() => Guid.Parse(User.FindFirst("id")!.Value);
+    private Guid GetFirmId()
+    {
+        var val = User.FindFirstValue("FirmId");
+        return string.IsNullOrEmpty(val) ? Guid.Empty : Guid.Parse(val);
+    }
+
+    private Guid GetUserId()
+    {
+        var val = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        return string.IsNullOrEmpty(val) ? Guid.Empty : Guid.Parse(val);
+    }
 
     [HttpGet]
     public async Task<IActionResult> GetCalendarFeed(
