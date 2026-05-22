@@ -70,6 +70,7 @@ import {
 import { useState, useEffect, useRef } from 'react';
 import api from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
+import { AddHearingDialog } from './AddHearingDialog';
 
 // ─── Data Types ─────────────────────────────────────────────────────
 interface CaseFile {
@@ -228,6 +229,7 @@ export default function CaseManagement() {
 
   // Add event states
   const [showAddEvent, setShowAddEvent] = useState(false);
+  const [showAddHearingDialog, setShowAddHearingDialog] = useState(false);
   const [addingEvent, setAddingEvent] = useState(false);
   const [newEventData, setNewEventData] = useState({
     eventType: 'Hearing',
@@ -1781,15 +1783,7 @@ export default function CaseManagement() {
                       type="button"
                       onClick={() => {
                         setShowEditCase(false);
-                        setCameFromEdit(true);
-                        setNewEventData({
-                          eventType: 'Hearing',
-                          title: 'Next hearing scheduled',
-                          description: 'Enter courtroom and judge instructions...',
-                          eventDate: new Date().toISOString().split('T')[0],
-                          attachmentId: ''
-                        });
-                        setShowAddEvent(true);
+                        setShowAddHearingDialog(true);
                       }}
                       className="text-primary hover:underline font-medium text-[11px] shrink-0"
                     >
@@ -1818,6 +1812,27 @@ export default function CaseManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AddHearingDialog
+        open={showAddHearingDialog}
+        onOpenChange={(open) => {
+          setShowAddHearingDialog(open);
+          if (!open) {
+            // Option to go back to edit case when this dialog closes?
+            // The user wanted this to feel seamless, but closing the dialog normally just closes it.
+            // If we want to restore edit dialog we could do: setShowEditCase(true); 
+          }
+        }}
+        cases={editCaseData ? [editCaseData] : []}
+        initialCaseId={editCaseData?.id}
+        initialDate={editCaseData?.nextDate}
+        onSuccess={() => {
+          loadCasesList();
+          if (editCaseData?.id) {
+            loadCaseDetails(editCaseData.id);
+          }
+        }}
+      />
 
       {/* Add Event Dialog */}
       <Dialog open={showAddEvent} onOpenChange={handleAddEventOpenChange}>

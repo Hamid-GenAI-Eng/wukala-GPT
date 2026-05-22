@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AddHearingDialog } from './AddHearingDialog';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -840,101 +841,12 @@ export default function HearingCalendar() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Add Hearing Dialog ─────────────────────────── */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="text-base font-sans">Schedule New Hearing</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2 space-y-1.5">
-                <Label className="text-xs font-sans">Link to Case *</Label>
-                <Select value={newHearing.caseId} onValueChange={(val) => setNewHearing({ ...newHearing, caseId: val })}>
-                  <SelectTrigger className="text-xs font-sans h-9"><SelectValue placeholder="Select case file..." /></SelectTrigger>
-                  <SelectContent>
-                    {cases.map((c: any) => (
-                      <SelectItem key={c.id} value={c.id} className="text-xs font-sans">{c.title} ({c.caseNumber})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-sans">Hearing Date *</Label>
-                <Input type="date" className="text-xs font-sans h-9" value={newHearing.hearingDate} onChange={e => setNewHearing({ ...newHearing, hearingDate: e.target.value })} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-sans">Time *</Label>
-                <Input type="time" className="text-xs font-sans h-9" value={newHearing.startTime} onChange={e => setNewHearing({ ...newHearing, startTime: e.target.value })} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-sans">Court *</Label>
-                <Select value={newHearing.courtName} onValueChange={(val) => setNewHearing({ ...newHearing, courtName: val })}>
-                  <SelectTrigger className="text-xs font-sans h-9"><SelectValue placeholder="Select court..." /></SelectTrigger>
-                  <SelectContent>
-                    {['Lahore High Court', 'Sessions Court, Islamabad', 'Supreme Court of Pakistan', 'Civil Court, Lahore', 'Banking Court, Lahore', 'Labour Court, Faisalabad'].map(c => (
-                      <SelectItem key={c} value={c} className="text-xs font-sans">{c}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-sans">Court Type *</Label>
-                <Select value={newHearing.courtType} onValueChange={(val) => setNewHearing({ ...newHearing, courtType: val })}>
-                  <SelectTrigger className="text-xs font-sans h-9"><SelectValue placeholder="Select type..." /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(courtColors).map(([k, v]) => (
-                      <SelectItem key={k} value={k} className="text-xs font-sans">
-                        <span className="flex items-center gap-1.5"><span className={`h-2 w-2 rounded-full ${v.dot}`} />{v.label}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-sans">Courtroom</Label>
-                <Input placeholder="e.g. Court 3" className="text-xs font-sans h-9" value={newHearing.courtRoom} onChange={e => setNewHearing({ ...newHearing, courtRoom: e.target.value })} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-sans">Judge</Label>
-                <Input placeholder="Judge name" className="text-xs font-sans h-9" value={newHearing.judgeName} onChange={e => setNewHearing({ ...newHearing, judgeName: e.target.value })} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-sans">Hearing Type</Label>
-                <Select value={newHearing.hearingType} onValueChange={(val) => setNewHearing({ ...newHearing, hearingType: val })}>
-                  <SelectTrigger className="text-xs font-sans h-9"><SelectValue placeholder="Type..." /></SelectTrigger>
-                  <SelectContent>
-                    {['Arguments', 'Evidence', 'Hearing', 'Discovery', 'Mediation', 'Constitutional Petition', 'Tax Appeal', 'Bail', 'Judgment'].map(t => (
-                      <SelectItem key={t} value={t} className="text-xs font-sans">{t}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-sans">Priority</Label>
-                <Select value={newHearing.priority} onValueChange={(val) => setNewHearing({ ...newHearing, priority: val })}>
-                  <SelectTrigger className="text-xs font-sans h-9"><SelectValue placeholder="Priority..." /></SelectTrigger>
-                  <SelectContent>
-                    {['critical', 'high', 'medium', 'low'].map(p => (
-                      <SelectItem key={p} value={p} className="text-xs font-sans capitalize">{p}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="col-span-2 space-y-1.5">
-                <Label className="text-xs font-sans">Notes</Label>
-                <Textarea placeholder="Any special instructions or preparation notes..." className="text-xs font-sans min-h-[60px]" value={newHearing.notes} onChange={e => setNewHearing({ ...newHearing, notes: e.target.value })} />
-              </div>
-            </div>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" size="sm" className="text-xs font-sans" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-            <Button size="sm" className="text-xs font-sans bg-gradient-primary gap-1.5" onClick={handleAddHearing}>
-              <Plus className="h-3 w-3" /> Schedule Hearing
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AddHearingDialog
+        open={showAddDialog}
+        onOpenChange={setShowAddDialog}
+        cases={cases}
+        onSuccess={loadHearings}
+      />
     </div>
   );
 }
