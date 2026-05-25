@@ -166,18 +166,84 @@ export default function ClientCRM() {
     }
     loadClients();
   }, []);
+  
+  const [editingClientId, setEditingClientId] = useState<string | null>(null);
 
-  const handleAddClient = async () => {
+  useEffect(() => {
+    async function loadClients() {
+      try {
+        const [clientsRes, statsRes, casesRes] = await Promise.allSettled([
+          api.getClients(),
+          api.getClientStats(),
+          api.getCases()
+        ]);
+        if (clientsRes.status === 'fulfilled') {
+          const list = clientsRes.value.data || clientsRes.value;
+          setClientList(Array.isArray(list) ? list : []);
+        }
+        if (statsRes.status === 'fulfilled') setClientStats(statsRes.value);
+        if (casesRes.status === 'fulfilled') setAvailableCases(casesRes.value.data || casesRes.value || []);
+      } catch (err) {
+        console.error("Failed to fetch client data", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadClients();
+  }, []);
+
+  const handleEditClick = (client: Client) => {
+    setEditingClientId(client.id);
+    setNewClientData({
+      fullName: client.fullName || '',
+      contactPerson: client.contactPerson || '',
+      cnic: client.cnic || '',
+      email: client.email || '',
+      phone: client.phone || '',
+      whatsapp: client.whatsapp || '',
+      city: client.city || '',
+      address: client.address || '',
+      type: client.tags.includes('Corporate') ? 'Corporate' : 'Individual',
+      tags: client.tags.join(', '),
+      linkedCaseId: '' // Don't allow relinking cases from this quick edit yet
+    } as any);
+    setShowAddClient(true);
+  };
+
+  const handleDeleteClient = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this client?')) return;
+    try {
+      await api.archiveClient(id);
+      setClientList(prev => prev.filter(c => c.id !== id));
+      if (selectedClient?.id === id) {
+        setSelectedClient(null);
+      }
+    } catch (err) {
+      console.error("Failed to delete client", err);
+    }
+  };
+
+  const handleSaveClient = async () => {
     try {
       setAddingClient(true);
-      const createdClient = await api.createClient(newClientData);
       
-      if (newClientData.linkedCaseId && newClientData.linkedCaseId !== 'none' && createdClient?.id) {
-        // Link the selected case to the new client
-        await api.updateCase(newClientData.linkedCaseId, { clientId: createdClient.id });
+      const payload = { ...newClientData };
+      if (typeof payload.tags === 'string') {
+        payload.tags = (payload.tags as string).split(',').map((t: string) => t.trim()).filter((t: string) => t);
+      }
+
+      if (editingClientId) {
+        await api.updateClient(editingClientId, payload);
+      } else {
+        const createdClient = await api.createClient(payload);
+        if (payload.linkedCaseId && payload.linkedCaseId !== 'none' && createdClient?.id) {
+          // Link the selected case to the new client
+          await api.updateCase(payload.linkedCaseId, { clientId: createdClient.id });
+        }
       }
       
       setShowAddClient(false);
+      setEditingClientId(null);
       // Reset form
       setNewClientData({
         fullName: '',
@@ -191,7 +257,8 @@ export default function ClientCRM() {
         vip: false,
         tags: [],
         linkedCaseId: ''
-      });
+      } as any);
+      
       // Refresh list
       const res = await api.getClients();
       const updatedList = res.data || res;
@@ -199,7 +266,7 @@ export default function ClientCRM() {
         setClientList(Array.isArray(updatedList) ? updatedList : []);
       }
     } catch (err) {
-      console.error("Failed to create client", err);
+      console.error("Failed to save client", err);
     } finally {
       setAddingClient(false);
     }
@@ -725,7 +792,7 @@ export default function ClientCRM() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-36 font-sans">
-                      <DropdownMenuItem onClick={e => { e.stopPropagation(); handleViewClient(client); }}>
+                      <DropdownMenuItem onClick={e => { e.stopPropagation(); handleEditClick(client); }}>
                         <Edit className="h-4 w-4 mr-2" />
                         Edit Profile
                       </DropdownMenuItem>
@@ -733,7 +800,7 @@ export default function ClientCRM() {
                         className="text-destructive focus:bg-destructive/10 focus:text-destructive"
                         onClick={e => {
                           e.stopPropagation();
-                          // deleteClient logic here if needed
+                          handleDeleteClient(client.id);
                         }}
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
@@ -814,12 +881,14 @@ export default function ClientCRM() {
         </DialogContent>
       </Dialog>
 
-      {/* Add Client Dialog */}
+      {/* Add/Edit Client Dialog */}
       <Dialog open={showAddClient} onOpenChange={setShowAddClient}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-sans text-base">Add New Client</DialogTitle>
-            <DialogDescription className="text-xs font-sans">Enter client details to create a new profile</DialogDescription>
+            <DialogTitle className="font-sans text-base">{editingClientId ? 'Edit Client' : 'Add New Client'}</DialogTitle>
+            <DialogDescription className="text-xs font-sans">
+              {editingClientId ? 'Update client details' : 'Enter client details to create a new profile'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -893,18 +962,20 @@ export default function ClientCRM() {
                 })}
               </div>
             </div>
-            <div className="pt-2 border-t border-border mt-2">
-              <label className="text-xs font-sans font-medium text-foreground mb-1 block">Link to Existing Case (Optional)</label>
-              <Select value={newClientData.linkedCaseId} onValueChange={val => setNewClientData({...newClientData, linkedCaseId: val})}>
-                <SelectTrigger className="h-9 text-xs font-sans"><SelectValue placeholder="Select a case..." /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">-- Do not link --</SelectItem>
-                  {availableCases.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.caseNumber} - {c.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {!editingClientId && (
+              <div className="pt-2 border-t border-border mt-2">
+                <label className="text-xs font-sans font-medium text-foreground mb-1 block">Link to Existing Case (Optional)</label>
+                <Select value={newClientData.linkedCaseId} onValueChange={val => setNewClientData({...newClientData, linkedCaseId: val})}>
+                  <SelectTrigger className="h-9 text-xs font-sans"><SelectValue placeholder="Select a case..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">-- Do not link --</SelectItem>
+                    {availableCases.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.caseNumber} - {c.title}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex items-center gap-2 mt-2">
               <input type="checkbox" id="vip" checked={newClientData.vip} onChange={e => setNewClientData({...newClientData, vip: e.target.checked})} className="rounded border-border" />
               <label htmlFor="vip" className="text-xs font-sans">Mark as VIP client</label>
@@ -915,9 +986,12 @@ export default function ClientCRM() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" size="sm" className="text-xs" onClick={() => setShowAddClient(false)}>Cancel</Button>
-            <Button size="sm" className="text-xs bg-primary gap-1.5" onClick={handleAddClient} disabled={addingClient || !newClientData.fullName || !newClientData.contactPerson}>
-              {addingClient && <Loader2 className="h-3 w-3 animate-spin" />} Create Client
+            <Button variant="outline" size="sm" className="text-xs" onClick={() => {
+              setShowAddClient(false);
+              setEditingClientId(null);
+            }}>Cancel</Button>
+            <Button size="sm" className="text-xs bg-primary gap-1.5" onClick={handleSaveClient} disabled={addingClient || !newClientData.fullName || !newClientData.contactPerson}>
+              {addingClient && <Loader2 className="h-3 w-3 animate-spin" />} {editingClientId ? 'Update Client' : 'Create Client'}
             </Button>
           </DialogFooter>
         </DialogContent>
