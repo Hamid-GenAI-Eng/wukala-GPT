@@ -194,7 +194,7 @@ public class CreateClientCommandHandler : IRequestHandler<CreateClientCommand, C
 
         var client = new Client
         {
-            FirmId = req.FirmId, CreatedById = req.CreatedById, FullName = req.FullName, ClientType = req.ClientType,
+            FirmId = req.FirmId, CreatedById = req.CreatedById, LawyerId = req.CreatedById, FullName = req.FullName, ClientType = req.ClientType,
             CompanyName = req.CompanyName, ContactPerson = req.ContactPerson, Email = req.Email, Phone = req.Phone,
             Whatsapp = req.Whatsapp, Cnic = req.Cnic, Address = req.Address, City = req.City, Province = req.Province,
             Tags = req.Tags, AcquisitionSource = req.AcquisitionSource, Notes = req.Notes, PortalEnabled = req.PortalEnabled
