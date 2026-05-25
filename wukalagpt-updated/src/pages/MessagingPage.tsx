@@ -192,12 +192,12 @@ export default function MessagingPage() {
     };
   }, [token, selectedConversation]);
 
-  // Handle direct navigation to a chat
   useEffect(() => {
     const initDirectChat = async () => {
-      if (!targetLawyerId || isLoading) return;
+      const targetId = targetLawyerId || searchParams.get('clientId');
+      if (!targetId || isLoading) return;
 
-      const existing = conversations.find(c => c.targetUserId === targetLawyerId);
+      const existing = conversations.find(c => c.targetUserId === targetId);
       if (existing) {
         if (selectedConversation?.id !== existing.id) {
           setSelectedConversation(existing);
@@ -205,23 +205,42 @@ export default function MessagingPage() {
           setShowMobileChat(true);
         }
       } else {
-        const tempId = `temp-${targetLawyerId}`;
+        const tempId = `temp-${targetId}`;
         const hasTemp = conversations.some(c => c.id === tempId);
         
         if (!hasTemp) {
           try {
-            const lawyer = await api.getPublicLawyer(targetLawyerId);
-            if (lawyer) {
+            // Fetch user details depending on whether it's a lawyer or client
+            let targetName = 'Unknown User';
+            let targetAvatar = undefined;
+            let isTargetLawyer = false;
+
+            if (targetLawyerId) {
+              const lawyer = await api.getPublicLawyer(targetId).catch(() => null);
+              if (lawyer) {
+                targetName = lawyer.fullName;
+                targetAvatar = lawyer.profileImage;
+                isTargetLawyer = true;
+              }
+            } else {
+              const client = await api.getClientDetail(targetId).catch(() => null);
+              if (client) {
+                targetName = client.fullName;
+                // Client might not have an avatar, default fallback will be used
+              }
+            }
+
+            if (targetName !== 'Unknown User') {
               const tempConv: Conversation = {
                 id: tempId,
-                targetUserId: targetLawyerId,
-                targetUserName: lawyer.fullName,
-                targetUserAvatar: lawyer.profileImage,
+                targetUserId: targetId,
+                targetUserName: targetName,
+                targetUserAvatar: targetAvatar,
                 lastMessage: 'Start a conversation',
                 lastMessageTime: new Date().toISOString(),
                 unreadCount: 0,
                 isOnline: false,
-                isLawyer: true,
+                isLawyer: isTargetLawyer,
               };
               setConversations(prev => [tempConv, ...prev]);
               setSelectedConversation(tempConv);
@@ -229,13 +248,13 @@ export default function MessagingPage() {
               setShowMobileChat(true);
             }
           } catch (e) {
-            console.error("Failed to load lawyer details for direct message", e);
+            console.error("Failed to load user details for direct message", e);
           }
         }
       }
     };
     initDirectChat();
-  }, [targetLawyerId, isLoading, conversations, selectedConversation]);
+  }, [targetLawyerId, searchParams, isLoading, conversations, selectedConversation]);
 
   const fetchConversations = async () => {
     try {

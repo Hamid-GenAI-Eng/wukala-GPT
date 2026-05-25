@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -96,6 +100,7 @@ const interactionColors: Record<string, string> = {
 
 // ─── Component ────────────────────────────────────────────────────
 export default function ClientCRM() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [tab, setTab] = useState('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
@@ -700,13 +705,42 @@ export default function ClientCRM() {
                   <span className="flex items-center gap-1"><Briefcase className="h-3 w-3" />{client.activeCasesCount} cases</span>
                   <span className="font-semibold text-foreground">{client.totalBilled}</span>
                 </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={e => e.stopPropagation()}>
-                    <Phone className="h-3 w-3" />
+                <div className="flex gap-1 items-center">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-7 w-7 hover:text-primary hover:bg-primary/10 transition-colors" 
+                    onClick={e => {
+                      e.stopPropagation();
+                      navigate(`/messages?clientId=${client.id}`);
+                    }}
+                    title="Message Client"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={e => e.stopPropagation()}>
-                    <MessageSquare className="h-3 w-3" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={e => e.stopPropagation()}>
+                        <MoreVertical className="h-3.5 w-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-36 font-sans">
+                      <DropdownMenuItem onClick={e => { e.stopPropagation(); handleViewClient(client); }}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Profile
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                        onClick={e => {
+                          e.stopPropagation();
+                          // deleteClient logic here if needed
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Client
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </CardContent>
@@ -859,7 +893,19 @@ export default function ClientCRM() {
                 })}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="pt-2 border-t border-border mt-2">
+              <label className="text-xs font-sans font-medium text-foreground mb-1 block">Link to Existing Case (Optional)</label>
+              <Select value={newClientData.linkedCaseId} onValueChange={val => setNewClientData({...newClientData, linkedCaseId: val})}>
+                <SelectTrigger className="h-9 text-xs font-sans"><SelectValue placeholder="Select a case..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">-- Do not link --</SelectItem>
+                  {availableCases.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.caseNumber} - {c.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2 mt-2">
               <input type="checkbox" id="vip" checked={newClientData.vip} onChange={e => setNewClientData({...newClientData, vip: e.target.checked})} className="rounded border-border" />
               <label htmlFor="vip" className="text-xs font-sans">Mark as VIP client</label>
             </div>
