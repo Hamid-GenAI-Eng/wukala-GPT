@@ -70,15 +70,16 @@ public class NotificationService : INotificationService
                 {
                     notification.Id,
                     notification.Title,
-                    notification.Description,
+                    Desc = notification.Description,
                     notification.Type,
                     notification.Priority,
                     notification.ActionLabel,
                     notification.ActionType,
                     RelatedCase = notification.RelatedCaseReference,
                     notification.Source,
-                    notification.IsRead,
-                    notification.CreatedAt
+                    Read = notification.IsRead,
+                    notification.CreatedAt,
+                    Time = GetTimeAgo(notification.CreatedAt)
                 }, cancellationToken);
             }
             catch
@@ -114,7 +115,7 @@ public class NotificationService : INotificationService
         {
             Id = n.Id,
             Title = n.Title,
-            Description = n.Description,
+            Desc = n.Description,
             Detail = n.Detail,
             Type = n.Type,
             Priority = n.Priority,
@@ -124,7 +125,7 @@ public class NotificationService : INotificationService
             Source = n.Source,
             Read = n.IsRead,
             CreatedAt = n.CreatedAt,
-            TimeAgo = GetTimeAgo(n.CreatedAt)
+            Time = GetTimeAgo(n.CreatedAt)
         }).ToList();
     }
 

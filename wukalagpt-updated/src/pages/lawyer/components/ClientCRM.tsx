@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -101,12 +102,14 @@ const interactionColors: Record<string, string> = {
 // ─── Component ────────────────────────────────────────────────────
 export default function ClientCRM() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [tab, setTab] = useState('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [detailTab, setDetailTab] = useState('overview');
   const [showAddClient, setShowAddClient] = useState(false);
+  const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const [showConflictCheck, setShowConflictCheck] = useState(false);
   const [showLogInteraction, setShowLogInteraction] = useState(false);
   const [conflictQuery, setConflictQuery] = useState('');
@@ -166,31 +169,6 @@ export default function ClientCRM() {
     }
     loadClients();
   }, []);
-  
-  const [editingClientId, setEditingClientId] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function loadClients() {
-      try {
-        const [clientsRes, statsRes, casesRes] = await Promise.allSettled([
-          api.getClients(),
-          api.getClientStats(),
-          api.getCases()
-        ]);
-        if (clientsRes.status === 'fulfilled') {
-          const list = clientsRes.value.data || clientsRes.value;
-          setClientList(Array.isArray(list) ? list : []);
-        }
-        if (statsRes.status === 'fulfilled') setClientStats(statsRes.value);
-        if (casesRes.status === 'fulfilled') setAvailableCases(casesRes.value.data || casesRes.value || []);
-      } catch (err) {
-        console.error("Failed to fetch client data", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadClients();
-  }, []);
 
   const handleEditClick = (client: Client) => {
     setEditingClientId(client.id);
@@ -218,8 +196,10 @@ export default function ClientCRM() {
       if (selectedClient?.id === id) {
         setSelectedClient(null);
       }
+      toast({ title: 'Success', description: 'Client deleted successfully.' });
     } catch (err) {
       console.error("Failed to delete client", err);
+      toast({ title: 'Error', description: 'Failed to delete client.', variant: 'destructive' });
     }
   };
 
@@ -265,8 +245,14 @@ export default function ClientCRM() {
       if (updatedList) {
         setClientList(Array.isArray(updatedList) ? updatedList : []);
       }
+      
+      toast({ 
+        title: 'Success', 
+        description: editingClientId ? 'Client profile updated successfully.' : 'New client created successfully.' 
+      });
     } catch (err) {
       console.error("Failed to save client", err);
+      toast({ title: 'Error', description: 'Failed to save client. Please try again.', variant: 'destructive' });
     } finally {
       setAddingClient(false);
     }

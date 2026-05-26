@@ -6,7 +6,7 @@ public class NotificationDto
 {
     public Guid Id { get; set; }
     public string Title { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
+    public string Desc { get; set; } = string.Empty;
     public string? Detail { get; set; }
     public string Type { get; set; } = string.Empty;
     public string Priority { get; set; } = string.Empty;
@@ -16,7 +16,7 @@ public class NotificationDto
     public string? Source { get; set; }
     public bool Read { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
-    public string TimeAgo { get; set; } = string.Empty;
+    public string Time { get; set; } = string.Empty;
 }
 
 public class NotificationSettingsDto

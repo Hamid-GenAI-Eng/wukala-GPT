@@ -30,7 +30,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import api from '@/services/api';
+import { api } from '@/services/api';
+import { toast } from 'sonner';
 
 // ── Types ──
 interface Notification {
@@ -89,6 +90,7 @@ const priorityBadge: Record<string, string> = {
 export default function SmartNotifications() {
   const [tab, setTab] = useState('all');
   const [items, setItems] = useState<Notification[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedNotif, setSelectedNotif] = useState<Notification | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [preferences, setPreferences] = useState<NotificationPreference[]>([
@@ -99,64 +101,21 @@ export default function SmartNotifications() {
     { type: 'reminder', label: 'Reminders', email: true, push: true, inApp: true, sound: true },
   ]);
 
+  const fetchNotifications = async () => {
+    setIsLoading(true);
+    try {
+      const data = await api.getNotifications('all');
+      setItems(data);
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error);
+      toast.error('Failed to load notifications');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Simulated data fetching
-    const mockData: Notification[] = [
-      {
-        id: '1',
-        title: 'Emergency Hearing Scheduled',
-        desc: 'New hearing for Case #2904-BK has been scheduled for tomorrow at 9:00 AM.',
-        detail: 'The judge has ordered an expedited hearing regarding the motion for stay. Please ensure all relevant documentation is uploaded to the portal by 6:00 PM today.',
-        type: 'urgent',
-        priority: 'critical',
-        time: '10m ago',
-        read: false,
-        actionLabel: 'View Case',
-        actionType: 'link',
-        relatedCase: 'Case #2904-BK',
-        source: 'Court System'
-      },
-      {
-        id: '2',
-        title: 'Document Signature Required',
-        desc: 'Client Sarah Jenkins has uploaded a new document for your review.',
-        detail: 'The client has signed the Power of Attorney form. You need to counter-sign and notarize it before submission to the tribunal.',
-        type: 'document',
-        priority: 'high',
-        time: '1h ago',
-        read: false,
-        actionLabel: 'Review Document',
-        actionType: 'link',
-        relatedCase: 'Jenkins v. State',
-        source: 'Client Portal'
-      },
-      {
-        id: '3',
-        title: 'Payment Received',
-        desc: 'Settlement payment for Case #1102-PT has been processed.',
-        detail: 'The wire transfer of $45,000.00 has been confirmed. The funds will be available in the escrow account within 2-3 business days.',
-        type: 'payment',
-        priority: 'medium',
-        time: '4h ago',
-        read: true,
-        actionLabel: 'View Billing',
-        relatedCase: 'Case #1102-PT',
-        source: 'Finance Department'
-      },
-      {
-        id: '4',
-        title: 'New Client Message',
-        desc: 'Mr. Al-Farsi sent a follow-up message regarding his consultation.',
-        detail: 'The client is inquiring about the next steps after the initial meeting. He wants to know if you can take his case on a contingency basis.',
-        type: 'client',
-        priority: 'medium',
-        time: '6h ago',
-        read: false,
-        actionLabel: 'Open Chat',
-        source: 'Wukala Messaging'
-      }
-    ];
-    setItems(mockData);
+    fetchNotifications();
   }, []);
 
   const unreadCount = items.filter(n => !n.read).length;
@@ -168,17 +127,36 @@ export default function SmartNotifications() {
     return n.type === tab;
   });
 
-  const markRead = (id: string) => {
-    setItems(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  const markRead = async (id: string) => {
+    try {
+      await api.markNotificationAsRead(id);
+      setItems(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    } catch (error) {
+      console.error('Failed to mark read:', error);
+      toast.error('Failed to update notification');
+    }
   };
 
-  const markAllRead = () => {
-    setItems(prev => prev.map(n => ({ ...n, read: true })));
+  const markAllRead = async () => {
+    try {
+      await api.markAllNotificationsAsRead();
+      setItems(prev => prev.map(n => ({ ...n, read: true })));
+      toast.success('All notifications marked as read');
+    } catch (error) {
+      console.error('Failed to mark all read:', error);
+      toast.error('Failed to update notifications');
+    }
   };
 
-  const dismissNotif = (id: string) => {
-    setItems(prev => prev.filter(n => n.id !== id));
-    if (selectedNotif?.id === id) setSelectedNotif(null);
+  const dismissNotif = async (id: string) => {
+    try {
+      await api.dismissNotification(id);
+      setItems(prev => prev.filter(n => n.id !== id));
+      if (selectedNotif?.id === id) setSelectedNotif(null);
+    } catch (error) {
+      console.error('Failed to dismiss notification:', error);
+      toast.error('Failed to dismiss notification');
+    }
   };
 
   const togglePref = (type: string, key: keyof NotificationPreference) => {
@@ -296,7 +274,11 @@ export default function SmartNotifications() {
 
             {/* Notification List */}
             <div className="space-y-2">
-              {filtered.length === 0 ? (
+              {isLoading ? (
+                <div className="flex justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary/50" />
+                </div>
+              ) : filtered.length === 0 ? (
                 <Card className="border-border/50 shadow-sm">
                   <CardContent className="p-8 text-center">
                     <BellOff className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
