@@ -9,7 +9,7 @@ langchain-core
 langchain-groq
 pymupdf
 python-jose[cryptography]
-passlib[bcrypt]
+bcrypt
 python-multipart
 python-dotenv
 FlagEmbedding
