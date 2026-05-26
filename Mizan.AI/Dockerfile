@@ -2,10 +2,13 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install system dependencies needed for PyMuPDF, sqlite, etc.
+# Install system dependencies needed for PyMuPDF, sqlite, bcrypt, etc.
 RUN apt-get update && apt-get install -y \
     build-essential \
     libsqlite3-dev \
+    libffi-dev \
+    cargo \
+    rustc \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install
