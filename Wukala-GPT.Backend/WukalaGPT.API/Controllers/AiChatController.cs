@@ -41,6 +41,27 @@ public class AiChatController : ControllerBase
         }
     }
 
+    public class UpdateTitleRequest { public string Title { get; set; } = string.Empty; }
+
+    [HttpPatch("sessions/{sessionId}/title")]
+    public async Task<IActionResult> UpdateSessionTitle(Guid sessionId, [FromBody] UpdateTitleRequest request)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            await _aiChatService.UpdateSessionTitleAsync(userId, sessionId, request.Title);
+            return NoContent();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpGet("sessions")]
     public async Task<IActionResult> GetUserSessions()
     {
@@ -94,6 +115,56 @@ public class AiChatController : ControllerBase
         }
     }
 
+    public class MultimodalFormPayload
+    {
+        public string? Message { get; set; }
+        public bool IsDeepResearch { get; set; }
+        public Guid? SessionId { get; set; }
+        public List<IFormFile>? Files { get; set; }
+    }
+
+    [HttpPost("message/multimodal")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> SendMessageMultimodal([FromForm] MultimodalFormPayload payload)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            var multimodalRequest = new AiChatMultimodalRequestDto
+            {
+                Message = payload.Message ?? string.Empty,
+                IsDeepResearch = payload.IsDeepResearch,
+                SessionId = payload.SessionId
+            };
+
+            if (payload.Files != null)
+            {
+                foreach (var file in payload.Files)
+                {
+                    using var memoryStream = new MemoryStream();
+                    await file.CopyToAsync(memoryStream);
+                    multimodalRequest.Files.Add(new MultimodalFileDto
+                    {
+                        FileName = file.FileName,
+                        ContentType = file.ContentType,
+                        ContentBytes = memoryStream.ToArray()
+                    });
+                }
+            }
+
+            var response = await _aiChatService.SendMultimodalMessageAsync(userId, multimodalRequest);
+            return Ok(response);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpDelete("sessions/{sessionId}")]
     public async Task<IActionResult> DeleteSession(Guid sessionId)
     {
@@ -106,6 +177,23 @@ public class AiChatController : ControllerBase
         catch (UnauthorizedAccessException)
         {
             return Forbid();
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("tts")]
+    public async Task<IActionResult> GenerateTts([FromBody] string text)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return BadRequest(new { message = "Text cannot be empty." });
+
+            var stream = await _aiChatService.GenerateTtsAsync(text);
+            return File(stream, "audio/mpeg");
         }
         catch (Exception ex)
         {

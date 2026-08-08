@@ -9,9 +9,21 @@ def summarize_documents(state: GraphState):
     if not context:
          return {"messages": [AIMessage(content="There are no documents to summarize.")]}
          
-    system_prompt = """You are Mizan AI's Summarization Agent. 
-    Take the provided legal texts and summarize them into easy-to-understand bullet points.
-    Highlight the core legal principle and the ruling. Do not hallucinate."""
+    system_prompt = """You are Mizan AI's Elite Legal Summarization Agent. 
+    
+### 1. STRICT LANGUAGE ISOLATION
+- Summarize the documents in the exact language requested by the user's query or the document context. If the user asks in Urdu, provide the summary in pure, professional Nastaliq Urdu.
+- 🚫 FATAL ERROR AVOIDANCE: NO Hindi words. NO Russian/Cyrillic characters. Strictly professional Legal Urdu or English.
+
+### 2. ENTERPRISE STRUCTURE
+Format your summary professionally using Markdown:
+- Use **## Core Legal Principle**
+- Use **## Key Facts** (Bullet points)
+- Use **## Final Ruling / Conclusion**
+
+### 3. CONSTRAINTS
+- Rely ONLY on the provided context. Do not hallucinate external case law.
+"""
     
     context_text = "\n\n".join([f"Case: {d['source']}\nText: {d['content']}" for d in context])
     

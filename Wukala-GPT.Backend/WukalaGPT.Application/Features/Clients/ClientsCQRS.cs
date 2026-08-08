@@ -95,7 +95,10 @@ public class GetClientsQueryHandler : IRequestHandler<GetClientsQuery, Paginated
 
     public async Task<PaginatedList<ClientDto>> Handle(GetClientsQuery req, CancellationToken cancellationToken)
     {
-        var cacheKey = $"clients:list:{req.FirmId}:{req.Search}_{req.Status}_{req.ClientType}_{req.Page}_{req.Limit}_{req.RetentionFlagged}_{(req.Tags != null ? string.Join(",", req.Tags) : "")}";
+        var versionKey = $"clients:version:{req.FirmId}";
+        var version = await _cache.GetStringAsync(versionKey, cancellationToken) ?? "1";
+        
+        var cacheKey = $"clients:list:{req.FirmId}:v{version}:{req.Search}_{req.Status}_{req.ClientType}_{req.Page}_{req.Limit}_{req.RetentionFlagged}_{(req.Tags != null ? string.Join(",", req.Tags) : "")}";
         var cachedData = await _cache.GetStringAsync(cacheKey, cancellationToken);
         
         if (!string.IsNullOrEmpty(cachedData))
@@ -185,7 +188,15 @@ public class CreateClientCommand : IRequest<ClientDto>
 public class CreateClientCommandHandler : IRequestHandler<CreateClientCommand, ClientDto>
 {
     private readonly IApplicationDbContext _db;
-    public CreateClientCommandHandler(IApplicationDbContext db) => _db = db;
+    private readonly IDistributedCache _cache;
+    private readonly INotificationService _notificationService;
+
+    public CreateClientCommandHandler(IApplicationDbContext db, IDistributedCache cache, INotificationService notificationService)
+    {
+        _db = db;
+        _cache = cache;
+        _notificationService = notificationService;
+    }
 
     public async Task<ClientDto> Handle(CreateClientCommand req, CancellationToken cancellationToken)
     {
@@ -203,6 +214,18 @@ public class CreateClientCommandHandler : IRequestHandler<CreateClientCommand, C
         _db.Clients.Add(client);
         await _db.SaveChangesAsync(cancellationToken);
         
+        // Invalidate cache by incrementing version
+        var versionKey = $"clients:version:{req.FirmId}";
+        var currentVersion = await _cache.GetStringAsync(versionKey, cancellationToken) ?? "1";
+        await _cache.SetStringAsync(versionKey, (int.Parse(currentVersion) + 1).ToString(), cancellationToken);
+
+        await _notificationService.SendNotificationAsync(
+            req.CreatedById,
+            "Client Created",
+            $"Client '{client.FullName}' has been successfully onboarded.",
+            "Client"
+        );
+
         // Assume MediatR Event here: await _mediator.Publish(new ClientCreatedEvent(client.Id));
 
         return new ClientDto { Id = client.Id, FullName = client.FullName, OnboardedAt = client.OnboardedAt };

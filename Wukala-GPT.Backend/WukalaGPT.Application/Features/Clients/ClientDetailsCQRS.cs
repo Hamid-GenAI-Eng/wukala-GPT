@@ -106,8 +106,8 @@ public class ArchiveClientCommandHandler : IRequestHandler<ArchiveClientCommand,
         var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == req.ClientId && c.FirmId == req.FirmId, cancellationToken);
         if (client == null) return false;
 
-        var activeCases = await _db.LegalCases.AnyAsync(c => c.ClientId == client.Id && c.Status != WukalaGPT.Domain.Enums.CaseStatus.Closed, cancellationToken);
-        if (activeCases) throw new Exception("Cannot archive client with active cases.");
+        var activeCases = await _db.LegalCases.AnyAsync(c => c.ClientId == client.Id && c.Status != WukalaGPT.Domain.Enums.CaseStatus.Closed && !c.IsArchived, cancellationToken);
+        if (activeCases) throw new InvalidOperationException("Cannot archive client with active cases.");
 
         client.IsArchived = true;
         client.ArchivedAt = DateTimeOffset.UtcNow;

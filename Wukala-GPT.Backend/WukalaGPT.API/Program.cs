@@ -43,7 +43,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("StrictProductionPolicy", policy =>
     {
         var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
-            ?? new[] { "https://wukala-gpt.app", "http://localhost:3000", "http://localhost:3001" };
+            ?? new[] { "https://wukala-gpt.app", "http://localhost:3000", "http://localhost:3001", "http://localhost:8080", "http://localhost:8081", "http://localhost:5173" };
             
         policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
@@ -139,6 +139,7 @@ using (var scope = app.Services.CreateScope())
 
 // Configure the HTTP request pipeline.
 app.ConfigureExceptionHandler();
+app.UseCors("StrictProductionPolicy"); // Ensure only whitelisted domains can hit API
 app.UseMiddleware<RedisRateLimitingMiddleware>();
 
 if (app.Environment.IsDevelopment())
@@ -152,7 +153,7 @@ else
 }
 
 app.UseWebSockets();
-app.UseCors("StrictProductionPolicy"); // Ensure only whitelisted domains can hit API
+// app.UseCors moved to the top of the pipeline
 
 // Add UseAuthentication if you have Auth configured
 app.UseAuthentication();

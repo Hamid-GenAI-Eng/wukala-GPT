@@ -38,7 +38,7 @@ public class MizanAiClient : IMizanAiClient
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_serviceTokenSecret));
         // Use HS256 as Python's jose default algorithm expects it
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature);
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         
         var tokenOptions = new JwtSecurityToken(
             claims: claims,
@@ -99,5 +99,86 @@ public class MizanAiClient : IMizanAiClient
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadAsByteArrayAsync();
+    }
+
+    public async Task<MizanAiChatResponse> SendMultimodalMessageAsync(string message, bool isDeepResearch, string conversationId, List<MultimodalFileDto> files)
+    {
+        var serviceToken = GenerateServiceToken();
+        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceToken);
+
+        using var content = new MultipartFormDataContent();
+        
+        content.Add(new StringContent(message ?? ""), "message");
+        content.Add(new StringContent(isDeepResearch.ToString().ToLower()), "is_deep_research");
+        content.Add(new StringContent(conversationId ?? ""), "conversation_id");
+
+        foreach (var file in files)
+        {
+            if (file.ContentBytes != null && file.ContentBytes.Length > 0)
+            {
+                var fileContent = new ByteArrayContent(file.ContentBytes);
+                if (!string.IsNullOrEmpty(file.ContentType))
+                {
+                    fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+                }
+                content.Add(fileContent, "files", file.FileName);
+            }
+        }
+
+        var response = await _httpClient.PostAsync("/api/v1/chat/multimodal", content);
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<MizanAiChatResponse>();
+        if (result == null)
+            throw new Exception("Received null response from Mizan AI multimodal endpoint.");
+            
+        return result;
+    }
+
+    public async Task<Stream> GenerateTtsAsync(string text)
+    {
+        var serviceToken = GenerateServiceToken();
+        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceToken);
+
+        var requestBody = new { text = text };
+        var response = await _httpClient.PostAsJsonAsync("/api/v1/chat/tts", requestBody);
+        
+        response.EnsureSuccessStatusCode();
+        
+        return await response.Content.ReadAsStreamAsync();
+    }
+    public async Task<WukalaGPT.Application.DTOs.Drafting.ExtractFieldsResponse> ExtractFieldsAsync(WukalaGPT.Application.DTOs.Drafting.ExtractFieldsRequest request)
+    {
+        var serviceToken = GenerateServiceToken();
+        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceToken);
+
+        var response = await _httpClient.PostAsJsonAsync("/api/v1/drafting/extract-fields", request);
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<WukalaGPT.Application.DTOs.Drafting.ExtractFieldsResponse>();
+        return result ?? new WukalaGPT.Application.DTOs.Drafting.ExtractFieldsResponse();
+    }
+
+    public async Task<Stream> GetTemplateFileAsync(string templatePath)
+    {
+        var serviceToken = GenerateServiceToken();
+        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceToken);
+
+        var response = await _httpClient.GetAsync($"/api/v1/drafting/template-file?path={Uri.EscapeDataString(templatePath)}");
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadAsStreamAsync();
+    }
+
+    public async Task<WukalaGPT.Application.DTOs.CaseIntelligence.CaseIntelligenceResponse> AnalyzeCaseAsync(WukalaGPT.Application.DTOs.CaseIntelligence.CaseIntelligenceRequest request)
+    {
+        var serviceToken = GenerateServiceToken();
+        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceToken);
+
+        var response = await _httpClient.PostAsJsonAsync("/api/v1/case-intelligence/analyze", request);
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<WukalaGPT.Application.DTOs.CaseIntelligence.CaseIntelligenceResponse>();
+        return result ?? new WukalaGPT.Application.DTOs.CaseIntelligence.CaseIntelligenceResponse();
     }
 }

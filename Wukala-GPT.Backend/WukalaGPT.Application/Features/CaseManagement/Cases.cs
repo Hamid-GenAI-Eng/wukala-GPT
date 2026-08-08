@@ -182,10 +182,12 @@ public class CreateCaseCommand : IRequest<CaseDto>
 public class CreateCaseCommandHandler : IRequestHandler<CreateCaseCommand, CaseDto>
 {
     private readonly IApplicationDbContext _context;
+    private readonly INotificationService _notificationService;
 
-    public CreateCaseCommandHandler(IApplicationDbContext context)
+    public CreateCaseCommandHandler(IApplicationDbContext context, INotificationService notificationService)
     {
         _context = context;
+        _notificationService = notificationService;
     }
 
     public async Task<CaseDto> Handle(CreateCaseCommand request, CancellationToken cancellationToken)
@@ -213,6 +215,13 @@ public class CreateCaseCommandHandler : IRequestHandler<CreateCaseCommand, CaseD
 
         _context.LegalCases.Add(caseEntity);
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _notificationService.SendNotificationAsync(
+            request.LeadLawyerId,
+            "Case Created",
+            $"A new case '{caseEntity.Title}' has been created successfully.",
+            "Case"
+        );
 
         // Map to DTO
         return new CaseDto
@@ -251,11 +260,13 @@ public class UpdateCaseCommandHandler : IRequestHandler<UpdateCaseCommand, CaseD
 {
     private readonly IApplicationDbContext _context;
     private readonly IMediator _mediator;
+    private readonly INotificationService _notificationService;
 
-    public UpdateCaseCommandHandler(IApplicationDbContext context, IMediator mediator)
+    public UpdateCaseCommandHandler(IApplicationDbContext context, IMediator mediator, INotificationService notificationService)
     {
         _context = context;
         _mediator = mediator;
+        _notificationService = notificationService;
     }
 
     public async Task<CaseDto> Handle(UpdateCaseCommand request, CancellationToken cancellationToken)
@@ -325,6 +336,13 @@ public class UpdateCaseCommandHandler : IRequestHandler<UpdateCaseCommand, CaseD
         caseEntity.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _notificationService.SendNotificationAsync(
+            caseEntity.LeadLawyerId,
+            "Case Updated",
+            $"Case '{caseEntity.Title}' has been updated.",
+            "Case"
+        );
 
         return new CaseDto 
         { 

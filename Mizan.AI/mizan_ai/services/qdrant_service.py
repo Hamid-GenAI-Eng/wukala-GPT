@@ -18,7 +18,7 @@ class QdrantService:
                 collection_name=self.collection_name,
                 vectors_config={
                     "dense": rest.VectorParams(
-                        size=1024, # bge-m3 dense vector size
+                        size=1024, # bge-large-en-v1.5 dense vector size
                         distance=rest.Distance.COSINE
                     )
                 },
@@ -66,10 +66,38 @@ class QdrantService:
                             indices=sparse_vector['indices'],
                             values=sparse_vector['values']
                         )
-                    },
-                    payload=payload
+                    }
                 )
             ]
+        )
+
+    def upsert_documents(self, points_payloads: list[dict]):
+        """
+        Batch upsert documents into Qdrant.
+        Expects a list of dicts with: point_id, dense_vector, sparse_vector, payload
+        """
+        if not points_payloads:
+            return
+
+        points = []
+        for p in points_payloads:
+            points.append(
+                rest.PointStruct(
+                    id=p["point_id"],
+                    vector={
+                        "dense": p["dense_vector"],
+                        "sparse": rest.SparseVector(
+                            indices=p["sparse_vector"]['indices'],
+                            values=p["sparse_vector"]['values']
+                        )
+                    },
+                    payload=p["payload"]
+                )
+            )
+            
+        self.client.upsert(
+            collection_name=self.collection_name,
+            points=points
         )
 
 qdrant_service = QdrantService()

@@ -184,93 +184,112 @@ export default function PracticeAnalytics() {
   const dynamicKpiCards: KPI[] = [
     { 
       label: 'Active Cases', 
-      value: overview?.activeCases?.toString() ?? '34', 
-      change: '+6', 
+      value: overview?.activeCases?.toString() ?? '0', 
+      change: overview ? 'Real-time data' : '-', 
       trend: 'up', 
       icon: Briefcase, 
-      detail: 'vs 28 last month' 
+      detail: 'Currently active cases' 
     },
     { 
       label: 'Win Rate', 
-      value: overview?.winRate ? `${overview.winRate}%` : '78%', 
-      change: '+4%', 
+      value: overview?.winRate ? `${overview.winRate}%` : '0%', 
+      change: '-', 
       trend: 'up', 
       icon: Award, 
-      detail: overview?.totalDecidedCases ? `Won ${Math.round(overview.totalDecidedCases * (overview.winRate / 100))} of ${overview.totalDecidedCases} decided` : 'Won 32 of 41 decided' 
+      detail: overview?.totalDecidedCases ? `Won ${Math.round(overview.totalDecidedCases * (overview.winRate / 100))} of ${overview.totalDecidedCases} decided` : 'No decided cases yet' 
     },
     { 
       label: 'Avg. Case Duration', 
-      value: overview?.avgCaseDurationMonths ? `${overview.avgCaseDurationMonths.toFixed(1)} mo` : '8.2 mo', 
-      change: '-1.3', 
+      value: overview?.avgCaseDurationMonths ? `${overview.avgCaseDurationMonths.toFixed(1)} mo` : '0 mo', 
+      change: '-', 
       trend: 'up', 
       icon: Clock, 
-      detail: 'Down from 9.5 months' 
+      detail: 'Based on closed cases' 
     },
     { 
       label: 'Monthly Revenue', 
-      value: overview?.monthlyRevenue ? `₨ ${(overview.monthlyRevenue / 1000000).toFixed(1)}M` : '₨ 4.2M', 
-      change: '+18%', 
+      value: overview?.monthlyRevenue ? `₨ ${(overview.monthlyRevenue / 1000000).toFixed(1)}M` : '₨ 0M', 
+      change: '-', 
       trend: 'up', 
       icon: DollarSign, 
-      detail: 'vs ₨ 3.6M last month' 
+      detail: 'Collected this month' 
     },
     { 
       label: 'Collection Rate', 
-      value: overview?.collectionRate ? `${overview.collectionRate}%` : '82%', 
-      change: '-3%', 
+      value: overview?.collectionRate ? `${overview.collectionRate}%` : '0%', 
+      change: '-', 
       trend: 'down', 
       icon: Target, 
-      detail: overview?.monthlyRevenue ? `₨ ${((overview.monthlyRevenue * (overview.collectionRate / 100)) / 1000000).toFixed(1)}M of ₨ ${(overview.monthlyRevenue / 1000000).toFixed(1)}M collected` : '₨ 3.4M of ₨ 4.2M collected' 
+      detail: overview?.monthlyRevenue ? `₨ ${((overview.monthlyRevenue * (overview.collectionRate / 100)) / 1000000).toFixed(1)}M collected` : 'No collections' 
     },
     { 
       label: 'New Clients', 
-      value: overview?.newClientsThisMonth?.toString() ?? '7', 
-      change: '+2', 
+      value: overview?.newClientsThisMonth?.toString() ?? '0', 
+      change: '-', 
       trend: 'up', 
       icon: UserPlus, 
-      detail: '5 referrals, 2 organic' 
+      detail: 'Acquired this month' 
     },
   ];
 
-  const dynamicRevenueData = overview?.revenueVsExpenses && overview.revenueVsExpenses.length > 0
+  const dynamicRevenueData = overview?.revenueVsExpenses
     ? overview.revenueVsExpenses.map((r: any) => ({
         month: r.month,
         revenue: Number(r.revenue),
         expenses: Number(r.expenses)
       }))
-    : revenueData;
+    : [];
 
-  const maxRevenue = Math.max(...dynamicRevenueData.map(d => d.revenue), 1);
+  const maxRevenue = Math.max(...dynamicRevenueData.map((d: any) => d.revenue), 1);
+
+  const totalDecided = overview?.caseOutcomes
+    ? (overview.caseOutcomes.won + overview.caseOutcomes.lost + overview.caseOutcomes.settled + overview.caseOutcomes.dismissed)
+    : 0;
 
   const dynamicCaseOutcomes = overview?.caseOutcomes
     ? [
-        { label: 'Won', value: overview.caseOutcomes.won, pct: Math.round((overview.caseOutcomes.won / (overview.caseOutcomes.won + overview.caseOutcomes.lost + overview.caseOutcomes.settled + overview.caseOutcomes.dismissed || 1)) * 100), color: 'bg-success' },
-        { label: 'Lost', value: overview.caseOutcomes.lost, pct: Math.round((overview.caseOutcomes.lost / (overview.caseOutcomes.won + overview.caseOutcomes.lost + overview.caseOutcomes.settled + overview.caseOutcomes.dismissed || 1)) * 100), color: 'bg-destructive' },
-        { label: 'Settled', value: overview.caseOutcomes.settled, pct: Math.round((overview.caseOutcomes.settled / (overview.caseOutcomes.won + overview.caseOutcomes.lost + overview.caseOutcomes.settled + overview.caseOutcomes.dismissed || 1)) * 100), color: 'bg-gold' },
+        { label: 'Won', value: overview.caseOutcomes.won, pct: Math.round((overview.caseOutcomes.won / (totalDecided || 1)) * 100), color: 'bg-success' },
+        { label: 'Lost', value: overview.caseOutcomes.lost, pct: Math.round((overview.caseOutcomes.lost / (totalDecided || 1)) * 100), color: 'bg-destructive' },
+        { label: 'Settled', value: overview.caseOutcomes.settled, pct: Math.round((overview.caseOutcomes.settled / (totalDecided || 1)) * 100), color: 'bg-gold' },
       ]
-    : caseOutcomes;
-  
-  const totalDecided = overview?.caseOutcomes
-    ? (overview.caseOutcomes.won + overview.caseOutcomes.lost + overview.caseOutcomes.settled + overview.caseOutcomes.dismissed)
-    : 41;
+    : [];
 
   const dynamicClientKPIs = clientsData
     ? [
-        { label: 'Total Clients', value: clientsData.totalClients?.toString() ?? '42', icon: Users, change: `+${clientsData.newThisMonth ?? 7} this month` },
-        { label: 'Retention Rate', value: clientsData.retentionRate ? `${clientsData.retentionRate}%` : '89%', icon: Repeat, change: 'Returning clients' },
-        { label: 'New This Month', value: clientsData.newThisMonth?.toString() ?? '7', icon: UserPlus, change: 'Referral & organic' },
-        { label: 'Avg. Lifetime Value', value: clientsData.avgLifetimeValue ? `₨ ${(clientsData.avgLifetimeValue / 1000000).toFixed(1)}M` : '₨ 2.1M', icon: DollarSign, change: 'Per client' },
+        { label: 'Total Clients', value: clientsData.totalClients?.toString() ?? '0', icon: Users, change: `+${clientsData.newThisMonth ?? 0} this month` },
+        { label: 'Retention Rate', value: clientsData.retentionRate ? `${clientsData.retentionRate}%` : '0%', icon: Repeat, change: 'Returning clients' },
+        { label: 'New This Month', value: clientsData.newThisMonth?.toString() ?? '0', icon: UserPlus, change: 'Recently acquired' },
+        { label: 'Avg. Lifetime Value', value: clientsData.avgLifetimeValue ? `₨ ${(clientsData.avgLifetimeValue / 1000000).toFixed(1)}M` : '₨ 0M', icon: DollarSign, change: 'Per client' },
       ]
     : [
-        { label: 'Total Clients', value: '42', icon: Users, change: '+7 this quarter' },
-        { label: 'Retention Rate', value: '89%', icon: Repeat, change: 'Returning clients' },
-        { label: 'New This Month', value: '7', icon: UserPlus, change: '5 referrals' },
-        { label: 'Avg. Lifetime Value', value: '₨ 2.1M', icon: DollarSign, change: 'Per client' },
+        { label: 'Total Clients', value: '0', icon: Users, change: '-' },
+        { label: 'Retention Rate', value: '0%', icon: Repeat, change: '-' },
+        { label: 'New This Month', value: '0', icon: UserPlus, change: '-' },
+        { label: 'Avg. Lifetime Value', value: '₨ 0', icon: DollarSign, change: '-' },
       ];
 
-  const dynamicHeatmapData = workload?.data && workload.data.length > 0
-    ? workload.data
-    : heatmapData;
+  const dynamicHeatmapData = workload?.data ? workload.data : [];
+
+  const dynamicCourtAnalytics = overview?.courtAnalytics ? overview.courtAnalytics : [];
+  const dynamicWinRateByType = overview?.winRateByType ? overview.winRateByType : [];
+  const dynamicPipelineStages = overview?.pipelineStages ? overview.pipelineStages : [];
+  
+  const dynamicRevenueSummary = overview?.revenueSummary || { yearlyRevenue: '₨ 0M', avgFeePerCase: '₨ 0M', collectionEfficiency: '0%', outstanding: '₨ 0M' };
+  const dynamicTopPayingClients = overview?.topPayingClients ? overview.topPayingClients : [];
+
+  const dynamicClientPortfolio = clientsData?.clientPortfolio ? clientsData.clientPortfolio : [];
+  const dynamicReferralSources = clientsData?.referralSources ? clientsData.referralSources : [];
+
+  const dynamicBusiestDays = workload?.busiestDays ? workload.busiestDays : [];
+  
+  const dynamicCapacityPlanning = workload?.capacityPlanning || {
+    availableCapacity: 'Available Capacity',
+    availableCapacitySub: 'Checking capacity...',
+    peakAlert: 'Workload Alert',
+    peakAlertSub: 'Monitoring schedule',
+    weeklyAvg: 'Weekly Avg.',
+    weeklyAvgSub: 'Calculating...'
+  };
 
   if (loading) {
     return (
@@ -414,7 +433,7 @@ export default function PracticeAnalytics() {
               <CardContent className="p-4">
                 <h3 className="text-sm font-semibold font-sans text-foreground mb-3">Win Rate by Practice Area</h3>
                 <div className="space-y-3">
-                  {winRateByType.map(w => (
+                  {dynamicWinRateByType.map((w: any) => (
                     <div key={w.type}>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-sans text-foreground">{w.type}</span>
@@ -434,7 +453,7 @@ export default function PracticeAnalytics() {
               <CardContent className="p-4">
                 <h3 className="text-sm font-semibold font-sans text-foreground mb-3">Court Analytics</h3>
                 <div className="space-y-2">
-                  {courtAnalytics.map(c => (
+                  {dynamicCourtAnalytics.map((c: any) => (
                     <div key={c.court} className="flex items-center gap-3 p-2.5 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors">
                       <div className={`h-2 w-2 rounded-full ${c.color} shrink-0`} />
                       <div className="flex-1 min-w-0">
@@ -459,13 +478,7 @@ export default function PracticeAnalytics() {
               <CardContent className="p-4">
                 <h3 className="text-sm font-semibold font-sans text-foreground mb-3">Case Pipeline</h3>
                 <div className="flex items-center gap-1">
-                  {[
-                    { stage: 'Filed', count: 6, color: 'bg-primary/20 text-primary' },
-                    { stage: 'Heard', count: 14, color: 'bg-gold/20 text-gold' },
-                    { stage: 'Reserved', count: 8, color: 'bg-warning/20 text-warning' },
-                    { stage: 'Decided', count: 4, color: 'bg-success/20 text-success' },
-                    { stage: 'Appeal', count: 2, color: 'bg-destructive/20 text-destructive' },
-                  ].map((s, i, arr) => (
+                  {dynamicPipelineStages.map((s: any, i: number, arr: any[]) => (
                     <div key={s.stage} className="flex items-center gap-1 flex-1">
                       <div className={`flex-1 rounded-lg p-3 text-center ${s.color}`}>
                         <p className="text-lg font-bold font-sans">{s.count}</p>
@@ -486,10 +499,10 @@ export default function PracticeAnalytics() {
             {/* Revenue Summary Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {[
-                { label: 'Yearly Revenue', value: '₨ 48.5M', sub: 'FY 2024-25' },
-                { label: 'Avg Fee / Case', value: '₨ 1.4M', sub: 'Across 34 cases' },
-                { label: 'Collection Efficiency', value: '82%', sub: '₨ 39.8M collected' },
-                { label: 'Outstanding', value: '₨ 8.7M', sub: '12 pending invoices' },
+                { label: 'Yearly Revenue', value: dynamicRevenueSummary.yearlyRevenue, sub: 'All recorded payments' },
+                { label: 'Avg Fee / Case', value: dynamicRevenueSummary.avgFeePerCase, sub: 'Across all cases' },
+                { label: 'Collection Efficiency', value: dynamicRevenueSummary.collectionEfficiency, sub: 'Payments vs Invoices' },
+                { label: 'Outstanding', value: dynamicRevenueSummary.outstanding, sub: 'Unpaid balances' },
               ].map(s => (
                 <Card key={s.label} className="border-border/50 shadow-sm">
                   <CardContent className="p-4 text-center">
@@ -520,7 +533,7 @@ export default function PracticeAnalytics() {
               <CardContent className="p-4">
                 <h3 className="text-sm font-semibold font-sans text-foreground mb-3">Top Paying Clients</h3>
                 <div className="space-y-2">
-                  {clientInsights.slice(0, 4).map((c, i) => (
+                  {dynamicTopPayingClients.map((c: any, i: number) => (
                     <div key={c.name} className="flex items-center justify-between p-2.5 rounded-lg bg-secondary/30">
                       <div className="flex items-center gap-2.5">
                         <span className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold font-sans text-primary">{i + 1}</span>
@@ -562,11 +575,11 @@ export default function PracticeAnalytics() {
               <CardContent className="p-4">
                 <h3 className="text-sm font-semibold font-sans text-foreground mb-3">Client Portfolio</h3>
                 <div className="space-y-2">
-                  {clientInsights.map(c => (
+                  {dynamicClientPortfolio.map((c: any) => (
                     <div key={c.name} className="flex items-center justify-between p-3 rounded-lg border border-border/50 hover:bg-secondary/30 transition-colors">
                       <div className="flex items-center gap-3">
                         <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold font-sans text-primary">
-                          {c.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                          {c.name.split(' ').map((n: string) => n[0]).slice(0, 2).join('')}
                         </div>
                         <div>
                           <p className="text-sm font-semibold font-sans text-foreground">{c.name}</p>
@@ -594,12 +607,7 @@ export default function PracticeAnalytics() {
               <CardContent className="p-4">
                 <h3 className="text-sm font-semibold font-sans text-foreground mb-3">Client Acquisition Sources</h3>
                 <div className="space-y-2.5">
-                  {[
-                    { source: 'Client Referrals', count: 22, pct: 52 },
-                    { source: 'Bar Association', count: 8, pct: 19 },
-                    { source: 'Online / WukalaGPT', count: 7, pct: 17 },
-                    { source: 'Walk-in', count: 5, pct: 12 },
-                  ].map(s => (
+                  {dynamicReferralSources.map((s: any) => (
                     <div key={s.source}>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-sans text-foreground">{s.source}</span>
@@ -651,17 +659,11 @@ export default function PracticeAnalytics() {
                 <CardContent className="p-4">
                   <h3 className="text-sm font-semibold font-sans text-foreground mb-3">Busiest Days</h3>
                   <div className="space-y-2">
-                    {[
-                      { day: 'Thursday', avg: 4.2, hearings: 50 },
-                      { day: 'Wednesday', avg: 3.8, hearings: 46 },
-                      { day: 'Tuesday', avg: 3.1, hearings: 37 },
-                      { day: 'Monday', avg: 2.5, hearings: 30 },
-                      { day: 'Friday', avg: 2.0, hearings: 24 },
-                    ].map(d => (
+                    {dynamicBusiestDays.map((d: any) => (
                       <div key={d.day} className="flex items-center gap-3">
                         <span className="text-xs font-sans text-foreground w-24">{d.day}</span>
                         <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
-                          <div className="h-full bg-gold rounded-full" style={{ width: `${(d.avg / 4.2) * 100}%` }} />
+                          <div className="h-full bg-gold rounded-full" style={{ width: `${Math.min((d.avg / (dynamicBusiestDays[0]?.avg || 1)) * 100, 100)}%` }} />
                         </div>
                         <span className="text-[10px] font-sans text-muted-foreground w-20 text-right">{d.avg} avg/wk</span>
                       </div>
@@ -675,16 +677,16 @@ export default function PracticeAnalytics() {
                   <h3 className="text-sm font-semibold font-sans text-foreground mb-3">Capacity Planning</h3>
                   <div className="space-y-3">
                     <div className="p-3 rounded-lg bg-success/10 border border-success/20">
-                      <p className="text-xs font-semibold font-sans text-success">Available Capacity</p>
-                      <p className="text-[10px] text-muted-foreground font-sans mt-0.5">You have ~6 hours free this week for new consultations</p>
+                      <p className="text-xs font-semibold font-sans text-success">{dynamicCapacityPlanning.availableCapacity}</p>
+                      <p className="text-[10px] text-muted-foreground font-sans mt-0.5">{dynamicCapacityPlanning.availableCapacitySub}</p>
                     </div>
                     <div className="p-3 rounded-lg bg-gold/10 border border-gold/20">
-                      <p className="text-xs font-semibold font-sans text-gold">Peak Month Alert</p>
-                      <p className="text-[10px] text-muted-foreground font-sans mt-0.5">March-April historically busiest — consider delegating to juniors</p>
+                      <p className="text-xs font-semibold font-sans text-gold">{dynamicCapacityPlanning.peakAlert}</p>
+                      <p className="text-[10px] text-muted-foreground font-sans mt-0.5">{dynamicCapacityPlanning.peakAlertSub}</p>
                     </div>
                     <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
-                      <p className="text-xs font-semibold font-sans text-primary">Weekly Avg.</p>
-                      <p className="text-[10px] text-muted-foreground font-sans mt-0.5">15.6 hearings/week · 3.1 per day average</p>
+                      <p className="text-xs font-semibold font-sans text-primary">{dynamicCapacityPlanning.weeklyAvg}</p>
+                      <p className="text-[10px] text-muted-foreground font-sans mt-0.5">{dynamicCapacityPlanning.weeklyAvgSub}</p>
                     </div>
                   </div>
                 </CardContent>

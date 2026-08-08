@@ -411,6 +411,7 @@ export default function ClientCRM() {
               <TabsTrigger value="cases" className="text-xs font-sans h-7">Cases ({selectedClient.cases.length})</TabsTrigger>
               <TabsTrigger value="communications" className="text-xs font-sans h-7">Communications ({selectedClient.interactions.length})</TabsTrigger>
               <TabsTrigger value="documents" className="text-xs font-sans h-7">Documents ({selectedClient.documents.length})</TabsTrigger>
+              <TabsTrigger value="virtual_munshi" className="text-xs font-sans h-7 text-primary gap-1.5"><FileText className="h-3 w-3" /> Virtual Munshi</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="mt-4 space-y-4">
@@ -574,6 +575,72 @@ export default function ClientCRM() {
                   ))}
                 </div>
               )}
+            </TabsContent>
+
+            {/* Virtual Munshi Tab */}
+            <TabsContent value="virtual_munshi" className="mt-4 space-y-4">
+              <div className="rounded-lg bg-gradient-to-r from-primary/10 to-transparent border border-primary/20 p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold font-sans text-primary">AI Outbox (Virtual Munshi)</h3>
+                    <p className="text-xs text-muted-foreground font-sans">Review and dispatch localized WhatsApp notifications to {selectedClient.contactPerson}.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Pending Notifications</p>
+                
+                {/* Mocked Pending Notification Item */}
+                <Card className="border-warning/30 bg-warning/5">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] text-warning border-warning/50 bg-warning/10">Draft</Badge>
+                        <span className="text-xs font-semibold text-foreground">Next Hearing Update</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">Generated Just Now</span>
+                    </div>
+                    <div className="bg-card border border-border/50 rounded-lg p-3 mb-3 relative">
+                      <p className="text-xs font-sans leading-relaxed">
+                        Assalam o Alaikum {selectedClient.contactPerson},<br/><br/>
+                        Aap ki case (Ali vs State) ki agli tareekh 12 Oct ko fix ho gai hai. Courtroom 4 mein judge sahab sunwaai karenge. Waqt par pohnchna zaroori hai.<br/><br/>
+                        Regards,<br/>HamidTech Ventures
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" className="text-xs h-8 text-primary border-primary hover:bg-primary/10 flex-1">
+                        <PhoneCall className="h-3 w-3 mr-1.5" /> Request Audio (Voice Note)
+                      </Button>
+                      <Button size="sm" className="bg-success text-success-foreground hover:bg-success/90 text-xs h-8 px-5">
+                        <Send className="h-3 w-3 mr-1.5" /> Approve & Send
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Mocked Sent Notification Item */}
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1 mt-6">Sent Notifications</p>
+                <Card className="border-border/50 opacity-70">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-[10px] text-success border-success/50 bg-success/10">Sent via WhatsApp</Badge>
+                        <span className="text-xs font-semibold text-foreground">Document Required Notice</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">Oct 5, 2023</span>
+                    </div>
+                    <div className="bg-card border border-border/50 rounded-lg p-3 relative">
+                      <p className="text-xs font-sans leading-relaxed">
+                        Assalam o Alaikum, Barae meharbani apni CNIC ki copy office mein jama karwa dein. Shukriya.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
           </Tabs>
 

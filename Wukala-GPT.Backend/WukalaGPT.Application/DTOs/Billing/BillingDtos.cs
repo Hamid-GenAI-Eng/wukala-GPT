@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 
 namespace WukalaGPT.Application.DTOs.Billing;
 
@@ -31,12 +32,24 @@ public class InvoiceItemDto
 
 public class CreateInvoiceDto
 {
+    [Required(ErrorMessage = "Client is required.")]
     public Guid ClientId { get; set; }
+    
     public Guid? CaseId { get; set; }
+    
+    [Required(ErrorMessage = "Case Reference is required.")]
     public string CaseRef { get; set; } = string.Empty;
+    
+    [Required]
     public DateTime DateIssued { get; set; }
+    
+    [Required]
     public DateTime DueDate { get; set; }
+    
+    [Required]
+    [MinLength(1, ErrorMessage = "At least one line item is required.")]
     public List<InvoiceItemDto> Items { get; set; } = new();
+    
     public string? Notes { get; set; }
 }
 

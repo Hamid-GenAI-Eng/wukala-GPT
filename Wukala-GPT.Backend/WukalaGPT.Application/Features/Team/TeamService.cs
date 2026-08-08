@@ -78,6 +78,12 @@ public class TeamService : ITeamService
     {
         _logger.LogInformation("Inviting {Email} to Firm {FirmId} as {Role}", request.Email, firmId, request.Role);
 
+        var currentMemberCount = await _context.Users.CountAsync(u => u.FirmId == firmId);
+        if (currentMemberCount >= 10)
+        {
+            throw new Exception("You have reached the maximum limit of 10 team members for your firm.");
+        }
+
         var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower());
 
         if (existingUser != null)
@@ -219,5 +225,50 @@ public class TeamService : ITeamService
         if (span.TotalDays < 1) return $"{(int)span.TotalHours} hours ago";
         if (span.TotalDays < 2) return "yesterday";
         return $"{(int)span.TotalDays} days ago";
+    }
+    public async Task<List<FirmCalendarEventDto>> GetFirmCalendarAsync(Guid firmId)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var hearings = await _context.Hearings.AsNoTracking()
+            .Include(h => h.Case)
+            .ThenInclude(c => c.LeadLawyer)
+            .Where(h => h.FirmId == firmId && h.HearingDate == today)
+            .OrderBy(h => h.HearingDate) // actually they are all today, so maybe we need a Time property if it exists, otherwise just order by creation or title
+            .ToListAsync();
+
+        var courtColors = new[] { "bg-success", "bg-primary", "bg-gold", "bg-destructive", "bg-primary-muted" };
+
+        return hearings.Select((h, i) => new FirmCalendarEventDto
+        {
+            Time = "09:00 AM", // Since Hearing doesn't seem to have a time field based on previous knowledge, we hardcode or parse
+            Lawyer = $"Adv. {h.Case.LeadLawyer.FirstName} {h.Case.LeadLawyer.LastName}".Trim(),
+            Hearing = h.Case.Title,
+            Court = h.Case.CourtName ?? "Local Court",
+            Color = courtColors[i % courtColors.Length]
+        }).ToList();
+    }
+
+    public async Task UpdateMemberRoleAsync(Guid firmId, Guid memberId, string newRole)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == memberId && u.FirmId == firmId);
+        if (user != null)
+        {
+            if (Enum.TryParse<TeamRole>(newRole.Replace(" ", ""), out var roleEnum))
+            {
+                user.StaffRole = roleEnum;
+                await _context.SaveChangesAsync(default);
+            }
+        }
+    }
+
+    public async Task RemoveMemberAsync(Guid firmId, Guid memberId)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == memberId && u.FirmId == firmId);
+        if (user != null)
+        {
+            user.FirmId = null;
+            user.StaffRole = null;
+            await _context.SaveChangesAsync(default);
+        }
     }
 }

@@ -69,4 +69,42 @@ public class DocumentDraftingController : ControllerBase
             return StatusCode(500, new { message = "Error exporting document", details = ex.Message });
         }
     }
+    [HttpPost("extract-fields")]
+    public async Task<ActionResult<ExtractFieldsResponse>> ExtractFields([FromBody] ExtractFieldsRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.TemplatePath))
+        {
+            return BadRequest(new { message = "Template path is required." });
+        }
+
+        try
+        {
+            var response = await _mizanAiClient.ExtractFieldsAsync(request);
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Error extracting fields", details = ex.Message });
+        }
+    }
+
+    [HttpGet("template-file")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetTemplateFile([FromQuery] string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return BadRequest(new { message = "Template path is required." });
+        }
+
+        try
+        {
+            var stream = await _mizanAiClient.GetTemplateFileAsync(path);
+            return File(stream, "application/pdf");
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = "Error fetching template file", details = ex.Message });
+        }
+    }
 }

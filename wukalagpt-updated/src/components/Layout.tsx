@@ -162,7 +162,20 @@ export default function Layout({ children }: LayoutProps) {
   const progressFrame = useRef<number | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, logout, isAuthenticated } = useAuth();
+  const { user, logout, isAuthenticated, token } = useAuth();
+  
+  // Real-time Notification Wiring
+  useEffect(() => {
+    if (isAuthenticated && token) {
+      import('@/services/notificationService').then(({ notificationService }) => {
+        notificationService.startConnection(token);
+      });
+    } else {
+      import('@/services/notificationService').then(({ notificationService }) => {
+        notificationService.stopConnection();
+      });
+    }
+  }, [isAuthenticated, token]);
 
   const getNavigation = () => {
     if (!isAuthenticated) return publicNavigation;

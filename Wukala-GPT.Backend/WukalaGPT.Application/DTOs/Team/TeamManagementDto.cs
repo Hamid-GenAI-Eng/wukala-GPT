@@ -45,3 +45,12 @@ public class InviteMemberRequestDto
     public string Email { get; set; } = string.Empty;
     public TeamRole Role { get; set; }
 }
+
+public class FirmCalendarEventDto
+{
+    public string Time { get; set; } = string.Empty;
+    public string Lawyer { get; set; } = string.Empty;
+    public string Hearing { get; set; } = string.Empty;
+    public string Court { get; set; } = string.Empty;
+    public string Color { get; set; } = string.Empty;
+}

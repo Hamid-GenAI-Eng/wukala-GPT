@@ -1,6 +1,58 @@
-# Root gitignore
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# IDEs and Editors
 .vscode/
 .vs/
 .idea/
-.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln.docstates
+
+# Python
+__pycache__/
+*.py[cod]
+*.class
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.pytest_cache/
+.coverage
+htmlcov/
+mizan_hf_cache/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+.pnpm-debug.log
+dist/
+build/
+.next/
+
+# .NET
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+TestResults/
+
+# Docker and specific app data
+qdrant_storage/
+wukala_pgdata_local/
+.docker/
 *.log

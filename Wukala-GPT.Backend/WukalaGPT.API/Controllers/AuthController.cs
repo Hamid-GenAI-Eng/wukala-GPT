@@ -17,12 +17,15 @@ public class AuthController : ControllerBase
         _authService = authService;
     }
 
+    private string GetIpAddress() => Request.Headers["X-Forwarded-For"].FirstOrDefault() ?? Request.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown IP";
+    private string GetUserAgent() => Request.Headers["User-Agent"].FirstOrDefault() ?? "Unknown Device";
+
     [HttpPost("register-client")]
     public async Task<IActionResult> RegisterClient([FromBody] RegisterClientDto dto)
     {
         try
         {
-            var result = await _authService.RegisterClientAsync(dto);
+            var result = await _authService.RegisterClientAsync(dto, GetIpAddress(), GetUserAgent());
             return Ok(result);
         }
         catch (Exception ex)
@@ -36,7 +39,7 @@ public class AuthController : ControllerBase
     {
         try
         {
-            var result = await _authService.RegisterLawyerAsync(dto);
+            var result = await _authService.RegisterLawyerAsync(dto, GetIpAddress(), GetUserAgent());
             return Ok(result);
         }
         catch (Exception ex)
@@ -64,7 +67,7 @@ public class AuthController : ControllerBase
     {
         try
         {
-            await _authService.ResendOtpAsync(dto);
+            await _authService.ResendOtpAsync(dto, GetIpAddress(), GetUserAgent());
             return Ok(new { message = "OTP sent successfully." });
         }
         catch (Exception ex)

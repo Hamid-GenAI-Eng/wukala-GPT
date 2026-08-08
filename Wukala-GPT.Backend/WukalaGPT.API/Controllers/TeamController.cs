@@ -138,4 +138,48 @@ public class TeamController : ControllerBase
             return BadRequest(new { Message = ex.Message });
         }
     }
+    [HttpGet("calendar")]
+    public async Task<ActionResult<List<FirmCalendarEventDto>>> GetCalendar()
+    {
+        try
+        {
+            var firmId = GetFirmId();
+            var result = await _teamService.GetFirmCalendarAsync(firmId);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+    }
+
+    [HttpPut("members/{id}/role")]
+    public async Task<ActionResult> UpdateMemberRole(Guid id, [FromBody] string newRole)
+    {
+        try
+        {
+            var firmId = GetFirmId();
+            await _teamService.UpdateMemberRoleAsync(firmId, id, newRole);
+            return Ok(new { Message = "Role updated successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+    }
+
+    [HttpDelete("members/{id}")]
+    public async Task<ActionResult> RemoveMember(Guid id)
+    {
+        try
+        {
+            var firmId = GetFirmId();
+            await _teamService.RemoveMemberAsync(firmId, id);
+            return Ok(new { Message = "Member removed successfully." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+    }
 }

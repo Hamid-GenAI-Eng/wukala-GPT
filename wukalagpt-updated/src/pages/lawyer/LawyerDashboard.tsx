@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/contexts/ThemeContext';
 import {
   Briefcase,
   Calendar,
   Users,
+  Moon,
+  Sun,
   FileText,
   DollarSign,
   Bell,
@@ -56,7 +59,14 @@ const sidebarItems = [
 ];
 
 export default function LawyerDashboard() {
-  const [activeSection, setActiveSection] = useState('overview');
+  const { isDark, toggleTheme } = useTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeSection = searchParams.get('tab') || 'overview';
+  
+  const setActiveSection = (section: string) => {
+    setSearchParams({ tab: section });
+  };
+  
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, logout } = useAuth();
@@ -292,6 +302,15 @@ export default function LawyerDashboard() {
             >
               <Bell className="h-[18px] w-[18px]" />
               <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-destructive rounded-full" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={toggleTheme}
+              title="Toggle Theme"
+            >
+              {isDark ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
             </Button>
             <Button variant="ghost" size="icon" className="h-9 w-9 hidden lg:flex">
               <Settings className="h-[18px] w-[18px]" />

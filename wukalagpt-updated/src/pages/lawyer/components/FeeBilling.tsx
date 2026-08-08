@@ -147,6 +147,78 @@ export default function FeeBilling() {
   const [loading, setLoading] = useState(true);
   const [showNewExpense, setShowNewExpense] = useState(false);
 
+  const [clients, setClients] = useState<any[]>([]);
+  const [clientCases, setClientCases] = useState<any[]>([]);
+
+  const [expenseForm, setExpenseForm] = useState({
+    category: '0',
+    description: '',
+    amount: '',
+    expenseDate: new Date().toISOString().split('T')[0]
+  });
+
+  const [invoiceForm, setInvoiceForm] = useState({
+    clientId: '',
+    caseRef: '',
+    dateIssued: new Date().toISOString().split('T')[0],
+    dueDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+    notes: '',
+    items: [{ description: '', hours: '', rate: '', amount: 0 }]
+  });
+
+  const handleSaveExpense = async () => {
+    if (!expenseForm.category || !expenseForm.amount || !expenseForm.expenseDate) {
+      alert('Please fill out Category, Amount, and Expense Date.');
+      return;
+    }
+    try {
+      await api.addExpense({
+        category: parseInt(expenseForm.category),
+        description: expenseForm.description,
+        amount: parseFloat(expenseForm.amount),
+        expenseDate: new Date(expenseForm.expenseDate).toISOString()
+      });
+      setShowNewExpense(false);
+      fetchExpenses(); // Refresh list
+    } catch (err) {
+      console.error('Failed to save expense', err);
+      alert('Failed to save expense');
+    }
+  };
+
+  const handleCreateInvoice = async () => {
+    if (!invoiceForm.clientId || !invoiceForm.caseRef || !invoiceForm.dateIssued || !invoiceForm.dueDate) {
+      alert('Client, Case Reference, Issue Date, and Due Date are required.');
+      return;
+    }
+    if (invoiceForm.items.length === 0 || invoiceForm.items.some(i => !i.description)) {
+      alert('At least one line item with a description is required.');
+      return;
+    }
+
+    try {
+      await api.createInvoice({
+        clientId: invoiceForm.clientId,
+        caseRef: invoiceForm.caseRef,
+        dateIssued: new Date(invoiceForm.dateIssued).toISOString(),
+        dueDate: new Date(invoiceForm.dueDate).toISOString(),
+        notes: invoiceForm.notes,
+        items: invoiceForm.items.map(item => ({
+          description: item.description,
+          hours: parseFloat(item.hours as string) || 0,
+          rate: parseFloat(item.rate as string) || 0,
+          amount: (parseFloat(item.hours as string) || 0) * (parseFloat(item.rate as string) || 0)
+        }))
+      });
+      setShowNewInvoice(false);
+      fetchInvoices(); // Refresh list
+      fetchInitialData(); // Refresh summary
+    } catch (err) {
+      console.error('Failed to create invoice', err);
+      alert('Failed to create invoice. Please check the inputs.');
+    }
+  };
+
   useEffect(() => {
     fetchInitialData();
   }, []);
@@ -154,73 +226,69 @@ export default function FeeBilling() {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      const summaryData = await api.getBillingSummary();
-      setSummary(summaryData);
-      await fetchInvoices();
-      await fetchPayments();
-      await fetchRetainers();
-      await fetchTemplates();
-    } catch (err) {
-      console.error('Failed to fetch billing data, using dummy fallback:', err);
+      try {
+        const summaryData = await api.getBillingSummary();
+        setSummary(summaryData);
+      } catch (err) {
+        console.error('Failed to fetch billing summary:', err);
+      }
       
-      // Dummy Summary
-      setSummary({
-        totalRevenue: 4850000,
-        outstandingAmount: 870000,
-        overdueAmount: 320000,
-        activeRetainersCount: 12,
-        totalRevenueFormatted: '₨ 4.85M',
-        outstandingAmountFormatted: '₨ 870K',
-        overdueAmountFormatted: '₨ 320K'
-      });
-
-      // Dummy Invoices
-      setInvoices([
-        { 
-          id: '1', invoiceNumber: 'INV-2024-001', clientName: 'Khan Industries Pvt Ltd', 
-          caseRef: 'CIV-99/2023', amount: 180000, amountFormatted: '₨ 180,000', 
-          dateIssued: 'Oct 10, 2024', dueDate: 'Oct 25, 2024', status: 'Paid',
-          items: [{ description: 'Legal Consultation', hours: 5, rate: 20000, amount: 100000 }]
-        },
-        { 
-          id: '2', invoiceNumber: 'INV-2024-002', clientName: 'Ahmed Real Estate', 
-          caseRef: 'PROP-44/2024', amount: 250000, amountFormatted: '₨ 250,000', 
-          dateIssued: 'Oct 15, 2024', dueDate: 'Oct 30, 2024', status: 'Pending',
-          items: [{ description: 'Property Verification', hours: 10, rate: 25000, amount: 250000 }]
-        },
-        { 
-          id: '3', invoiceNumber: 'INV-2024-003', clientName: 'Fatima Bibi', 
-          caseRef: 'FML-12/2024', amount: 45000, amountFormatted: '₨ 45,000', 
-          dateIssued: 'Sep 20, 2024', dueDate: 'Oct 05, 2024', status: 'Overdue',
-          items: [{ description: 'Court Appearance', hours: 2, rate: 22500, amount: 45000 }]
-        }
+      await Promise.all([
+        fetchInvoices(),
+        fetchPayments(),
+        fetchRetainers(),
+        fetchTemplates(),
+        fetchExpenses(),
+        fetchClients()
       ]);
-
-      // Dummy Payments
-      setPayments([
-        { id: 'p1', invoiceNumber: 'INV-2024-001', clientName: 'Khan Industries', amount: 180000, date: 'Oct 12, 2024', method: 'Bank Transfer', reference: 'TRX-99812', status: 'Completed' }
-      ]);
-
-      // Dummy Retainers
-      setRetainers([
-        { id: 'r1', retainerNumber: 'RET-001', clientName: 'Khan Industries', totalAmount: 1000000, usedAmount: 650000, startDate: 'Jan 01, 2024', endDate: 'Dec 31, 2024', status: 'Active', billingCycle: 'Monthly' }
-      ]);
-
-      // Dummy Templates
-      setTemplates([
-        { id: 't1', name: 'Standard Litigation', category: 'Civil', description: 'Base fee for civil court proceedings', items: [], usageCount: 45, lastUsed: '2 days ago' }
-      ]);
-
-      // Dummy Expenses
-      setExpenses([
-        { id: 'e1', date: 'Oct 20, 2024', category: EXPENSE_CATEGORIES.OFFICE_RENT, description: 'Chamber Rent - Lahore High Court', amount: 45000, status: 'Paid', icon: 'building' },
-        { id: 'e2', date: 'Oct 21, 2024', category: EXPENSE_CATEGORIES.SOFTWARE, description: 'Wukala-GPT Subscription', amount: 8500, status: 'Paid', icon: 'cpu' },
-        { id: 'e3', date: 'Oct 22, 2024', category: EXPENSE_CATEGORIES.SALARIES, description: 'Junior Associate Stipend', amount: 25000, status: 'Processing', icon: 'users' },
-        { id: 'e4', date: 'Oct 22, 2024', category: EXPENSE_CATEGORIES.TRAVEL, description: 'Outstation Hearing - Islamabad', amount: 12000, status: 'Paid', icon: 'map-pin' }
-      ]);
-
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchClients = async () => {
+    try {
+      const data = await api.getClients();
+      const clientsArray = Array.isArray(data) ? data : (data?.data || data?.Data || data?.items || data?.Items || []);
+      setClients(clientsArray);
+    } catch (err) { console.error('Failed to fetch clients', err); }
+  };
+
+  const handleClientChange = async (clientId: string) => {
+    setInvoiceForm({ ...invoiceForm, clientId, caseRef: '' });
+    try {
+      const cases = await api.getCases({ clientId });
+      const casesArray = Array.isArray(cases) ? cases : (cases?.data || cases?.Data || cases?.items || cases?.Items || []);
+      setClientCases(casesArray);
+    } catch (err) { console.error('Failed to fetch cases', err); }
+  };
+
+  const handleTemplateChange = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      setInvoiceForm({
+        ...invoiceForm,
+        notes: template.description || invoiceForm.notes,
+        items: template.items && template.items.length > 0 
+          ? template.items.map(i => ({ description: i.description, hours: '', rate: i.rate, amount: 0 }))
+          : [{ description: template.name, hours: '', rate: '', amount: 0 }]
+      });
+    }
+  };
+
+  const fetchExpenses = async () => {
+    try {
+      const data = await api.getExpenses();
+      setExpenses(data.map((e: any) => ({
+        id: e.id,
+        date: new Date(e.expenseDate).toLocaleDateString(),
+        category: Object.values(EXPENSE_CATEGORIES)[e.category] || 'General',
+        description: e.description,
+        amount: e.amount,
+        status: 'Paid'
+      })));
+    } catch (err) {
+      console.error('Failed to fetch expenses:', err);
     }
   };
 
@@ -856,13 +924,13 @@ export default function FeeBilling() {
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label className="text-xs font-sans">Expense Category</Label>
-              <Select>
+              <Select value={expenseForm.category} onValueChange={(val) => setExpenseForm({...expenseForm, category: val})}>
                 <SelectTrigger className="h-9 text-xs">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(EXPENSE_CATEGORIES).map(([key, value]) => (
-                    <SelectItem key={key} value={key} className="text-xs">{value}</SelectItem>
+                  {Object.entries(EXPENSE_CATEGORIES).map(([key, value], idx) => (
+                    <SelectItem key={key} value={idx.toString()} className="text-xs">{value}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -870,17 +938,20 @@ export default function FeeBilling() {
             
             <div className="space-y-1.5">
               <Label className="text-xs font-sans">Description</Label>
-              <Input placeholder="e.g. Monthly Internet Bill or Junior Associate stipend" className="h-9 text-xs" />
+              <Input placeholder="e.g. Monthly Internet Bill or Junior Associate stipend" className="h-9 text-xs" 
+                value={expenseForm.description} onChange={(e) => setExpenseForm({...expenseForm, description: e.target.value})} />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Amount (₨)</Label>
-                <Input type="number" placeholder="0.00" className="h-9 text-xs" />
+                <Input type="number" placeholder="0.00" className="h-9 text-xs" 
+                  value={expenseForm.amount} onChange={(e) => setExpenseForm({...expenseForm, amount: e.target.value})} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Expense Date</Label>
-                <Input type="date" className="h-9 text-xs" />
+                <Input type="date" className="h-9 text-xs" 
+                  value={expenseForm.expenseDate} onChange={(e) => setExpenseForm({...expenseForm, expenseDate: e.target.value})} />
               </div>
             </div>
 
@@ -899,7 +970,7 @@ export default function FeeBilling() {
             <DialogClose asChild>
               <Button variant="outline" size="sm" className="text-xs font-sans h-9">Cancel</Button>
             </DialogClose>
-            <Button size="sm" className="bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs font-sans h-9 px-5">
+            <Button size="sm" className="bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs font-sans h-9 px-5" onClick={handleSaveExpense}>
               Save Expense
             </Button>
           </DialogFooter>
@@ -917,34 +988,42 @@ export default function FeeBilling() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Client</Label>
-                <Select><SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select client" /></SelectTrigger>
+                <Select value={invoiceForm.clientId} onValueChange={handleClientChange}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select client" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="khan">Khan Industries Ltd.</SelectItem>
-                    <SelectItem value="noor">Noor Enterprises</SelectItem>
-                    <SelectItem value="fatima">Fatima Enterprises</SelectItem>
-                    <SelectItem value="islamabad">Islamabad Realty Corp.</SelectItem>
-                    <SelectItem value="pwu">Pakistan Workers Union</SelectItem>
+                    {clients.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.fullName}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Case Reference</Label>
-                <Input placeholder="CASE-2024-XXX" className="h-9 text-xs" />
+                <Select value={invoiceForm.caseRef} onValueChange={(val) => setInvoiceForm({...invoiceForm, caseRef: val})} disabled={!invoiceForm.clientId}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select case" /></SelectTrigger>
+                  <SelectContent>
+                    {clientCases.map(c => (
+                      <SelectItem key={c.id} value={c.caseNumber}>{c.title} ({c.caseNumber})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Invoice Date</Label>
-                <Input type="date" className="h-9 text-xs" />
+                <Input type="date" className="h-9 text-xs" 
+                  value={invoiceForm.dateIssued} onChange={(e) => setInvoiceForm({...invoiceForm, dateIssued: e.target.value})} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-sans">Due Date</Label>
-                <Input type="date" className="h-9 text-xs" />
+                <Input type="date" className="h-9 text-xs" 
+                  value={invoiceForm.dueDate} onChange={(e) => setInvoiceForm({...invoiceForm, dueDate: e.target.value})} />
               </div>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-sans">Billing Template</Label>
-              <Select><SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Choose a template (optional)" /></SelectTrigger>
+              <Select onValueChange={handleTemplateChange}><SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Choose a template (optional)" /></SelectTrigger>
                 <SelectContent>
                   {templates.map(t => (
                     <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
@@ -956,28 +1035,51 @@ export default function FeeBilling() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-sans">Line Items</Label>
-                <Button variant="ghost" size="sm" className="text-[10px] h-6 gap-1 text-primary"><Plus className="h-3 w-3" />Add Item</Button>
+                <Button variant="ghost" size="sm" className="text-[10px] h-6 gap-1 text-primary" 
+                  onClick={() => setInvoiceForm({...invoiceForm, items: [...invoiceForm.items, { description: '', hours: '', rate: '', amount: 0 }]})}>
+                  <Plus className="h-3 w-3" />Add Item
+                </Button>
               </div>
-              {[1].map(idx => (
+              {invoiceForm.items.map((item, idx) => (
                 <div key={idx} className="grid grid-cols-12 gap-2 items-end">
                   <div className="col-span-5 space-y-1">
-                    {idx === 1 && <Label className="text-[10px] font-sans text-muted-foreground">Description</Label>}
-                    <Input placeholder="Service description" className="h-8 text-xs" />
+                    {idx === 0 && <Label className="text-[10px] font-sans text-muted-foreground">Description</Label>}
+                    <Input placeholder="Service description" className="h-8 text-xs" 
+                      value={item.description} onChange={(e) => {
+                        const newItems = [...invoiceForm.items];
+                        newItems[idx].description = e.target.value;
+                        setInvoiceForm({...invoiceForm, items: newItems});
+                      }} />
                   </div>
                   <div className="col-span-2 space-y-1">
-                    {idx === 1 && <Label className="text-[10px] font-sans text-muted-foreground">Hours</Label>}
-                    <Input type="number" placeholder="Hrs" className="h-8 text-xs" />
+                    {idx === 0 && <Label className="text-[10px] font-sans text-muted-foreground">Hours</Label>}
+                    <Input type="number" placeholder="Hrs" className="h-8 text-xs" 
+                      value={item.hours} onChange={(e) => {
+                        const newItems = [...invoiceForm.items];
+                        newItems[idx].hours = e.target.value;
+                        setInvoiceForm({...invoiceForm, items: newItems});
+                      }} />
                   </div>
                   <div className="col-span-2 space-y-1">
-                    {idx === 1 && <Label className="text-[10px] font-sans text-muted-foreground">Rate (₨)</Label>}
-                    <Input type="number" placeholder="Rate" className="h-8 text-xs" />
+                    {idx === 0 && <Label className="text-[10px] font-sans text-muted-foreground">Rate (₨)</Label>}
+                    <Input type="number" placeholder="Rate" className="h-8 text-xs" 
+                      value={item.rate} onChange={(e) => {
+                        const newItems = [...invoiceForm.items];
+                        newItems[idx].rate = e.target.value;
+                        setInvoiceForm({...invoiceForm, items: newItems});
+                      }} />
                   </div>
                   <div className="col-span-2 space-y-1">
-                    {idx === 1 && <Label className="text-[10px] font-sans text-muted-foreground">Amount</Label>}
-                    <Input disabled placeholder="₨ 0" className="h-8 text-xs bg-secondary/50" />
+                    {idx === 0 && <Label className="text-[10px] font-sans text-muted-foreground">Amount</Label>}
+                    <Input disabled placeholder="₨ 0" className="h-8 text-xs bg-secondary/50" 
+                      value={`₨ ${((parseFloat(item.hours as string) || 0) * (parseFloat(item.rate as string) || 0)).toLocaleString()}`} />
                   </div>
                   <div className="col-span-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"><X className="h-3 w-3" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        const newItems = invoiceForm.items.filter((_, i) => i !== idx);
+                        setInvoiceForm({...invoiceForm, items: newItems});
+                      }}><X className="h-3 w-3" /></Button>
                   </div>
                 </div>
               ))}
@@ -985,13 +1087,14 @@ export default function FeeBilling() {
 
             <div className="space-y-1.5">
               <Label className="text-xs font-sans">Notes</Label>
-              <Textarea placeholder="Additional notes or payment terms..." className="text-xs min-h-[60px]" />
+              <Textarea placeholder="Additional notes or payment terms..." className="text-xs min-h-[60px]" 
+                value={invoiceForm.notes} onChange={(e) => setInvoiceForm({...invoiceForm, notes: e.target.value})} />
             </div>
           </div>
           <DialogFooter className="gap-2">
             <DialogClose asChild><Button variant="outline" size="sm" className="text-xs font-sans">Cancel</Button></DialogClose>
             <Button size="sm" variant="outline" className="text-xs font-sans gap-1.5"><Eye className="h-3 w-3" />Preview</Button>
-            <Button size="sm" className="bg-gradient-primary text-xs font-sans gap-1.5"><Send className="h-3 w-3" />Create & Send</Button>
+            <Button size="sm" className="bg-gradient-primary text-xs font-sans gap-1.5" onClick={handleCreateInvoice}><Send className="h-3 w-3" />Create & Send</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

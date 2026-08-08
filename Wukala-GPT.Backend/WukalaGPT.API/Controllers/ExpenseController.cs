@@ -81,4 +81,29 @@ public class ExpenseController : ControllerBase
             return BadRequest(new { Message = ex.Message });
         }
     }
+
+    [HttpGet]
+    public async Task<ActionResult<System.Collections.Generic.IEnumerable<FirmExpense>>> GetExpenses()
+    {
+        try
+        {
+            var firmId = GetFirmId();
+            if (firmId == Guid.Empty)
+            {
+                return Ok(new System.Collections.Generic.List<FirmExpense>()); // Return empty list if no firm
+            }
+
+            var expenses = await _context.FirmExpenses
+                .AsNoTracking()
+                .Where(e => e.FirmId == firmId)
+                .OrderByDescending(e => e.ExpenseDate)
+                .ToListAsync();
+
+            return Ok(expenses);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Message = ex.Message });
+        }
+    }
 }

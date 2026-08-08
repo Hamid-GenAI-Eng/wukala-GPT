@@ -23,5 +23,7 @@ services:
       - qdrant
     env_file:
       - .env
+    environment:
+      - QDRANT_HOST=qdrant
     restart: unless-stopped
 

@@ -9,7 +9,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 // Request timeout in milliseconds (increased for large file uploads and Azure cold-starts)
-const REQUEST_TIMEOUT = 120000;
+const REQUEST_TIMEOUT = 300000;
 
 /**
  * Custom error class for API errors
@@ -84,6 +84,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
+import { triggerGlobalRefresh } from '../utils/events';
+
 /**
  * Generic request function with timeout and params support
  */
@@ -122,6 +124,13 @@ async function request<T>(
     });
 
     clearTimeout(timeoutId);
+    
+    // Trigger global UI refresh on mutations
+    const method = options.method?.toUpperCase() || 'GET';
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      setTimeout(() => triggerGlobalRefresh(), 50);
+    }
+    
     return handleResponse<T>(response);
   } catch (error) {
     clearTimeout(timeoutId);
@@ -814,6 +823,27 @@ export const api = {
     }, true);
   },
 
+  // ==================== EXPENSE ENDPOINTS ====================
+
+  /**
+   * Get firm expenses
+   */
+  getExpenses: async () => {
+    return request<any[]>('/Expense', {
+      method: 'GET',
+    }, true);
+  },
+
+  /**
+   * Add a new firm expense
+   */
+  addExpense: async (data: any) => {
+    return request<any>('/Expense', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
   // ==================== AI CHAT ENDPOINTS ====================
 
   /**
@@ -854,6 +884,23 @@ export const api = {
     }, true);
   },
 
+  sendAiChatMessageMultimodal: async (message: string, isDeepResearch: boolean, sessionId: string | null, files: File[]) => {
+    const formData = new FormData();
+    formData.append('message', message);
+    formData.append('isDeepResearch', isDeepResearch.toString());
+    if (sessionId) {
+      formData.append('sessionId', sessionId);
+    }
+    files.forEach((file) => {
+      formData.append('files', file);
+    });
+
+    return request<AiChatResponse>('/AiChat/message/multimodal', {
+      method: 'POST',
+      body: formData
+    }, true);
+  },
+
   /**
    * Delete an AI Chat session
    */
@@ -861,6 +908,31 @@ export const api = {
     return request<void>(`/AiChat/sessions/${sessionId}`, {
       method: 'DELETE',
     }, true);
+  },
+
+  /**
+   * Generate Text-to-Speech audio
+   */
+  generateTts: async (text: string) => {
+    const token = getAuthToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/AiChat/tts`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(text)
+    });
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+
+    return await response.blob();
   },
 
   // ==================== PRACTICE ANALYTICS ENDPOINTS ====================
@@ -920,6 +992,25 @@ export const api = {
   getTeamActivity: async () => {
     return request<any[]>('/Team/activity', {
       method: 'GET',
+    }, true);
+  },
+
+  getFirmCalendar: async () => {
+    return request<any[]>('/Team/calendar', {
+      method: 'GET',
+    }, true);
+  },
+
+  updateTeamMemberRole: async (id: string, newRole: string) => {
+    return request<any>(`/Team/members/${id}/role`, {
+      method: 'PUT',
+      body: JSON.stringify(newRole),
+    }, true);
+  },
+
+  removeTeamMember: async (id: string) => {
+    return request<any>(`/Team/members/${id}`, {
+      method: 'DELETE',
     }, true);
   },
 
@@ -1128,7 +1219,7 @@ export const api = {
     }, true);
   },
 
-  removeTeamMember: async (id: string, uid: string) => {
+  removeCaseAssignment: async (id: string, uid: string) => {
     return request<any>(`/Cases/${id}/assignments/${uid}`, {
       method: 'DELETE',
     }, true);
@@ -1203,6 +1294,54 @@ export const api = {
     return request<any>(`/Clients/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
+    }, true);
+  },
+  // ==================== CASE INTELLIGENCE ENDPOINTS ====================
+  analyzeCaseIntelligence: async (data: any) => {
+    return request<any>('/CaseIntelligence/analyze', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+  // ==================== VIRTUAL MUNSHI ENDPOINTS ====================
+  uploadCauseList: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request<any>('/VirtualMunshi/cause-list', {
+      method: 'POST',
+      body: formData,
+    }, true);
+  },
+  generateMunshiNotification: async (data: any) => {
+    return request<any>('/VirtualMunshi/generate-notification', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  // ==================== DOCUMENT DRAFTING ENDPOINTS ====================
+  getDraftingTemplates: async () => {
+    return request<any>('/document-drafting/templates', {
+      method: 'GET',
+    }, true);
+  },
+
+  // ==================== DOCUMENT VAULT ENDPOINTS ====================
+  getLegalDocuments: async (type?: string, search?: string) => {
+    let url = '/Documents';
+    const params = new URLSearchParams();
+    if (type) params.append('type', type);
+    if (search) params.append('search', search);
+    if (params.toString()) url += `?${params.toString()}`;
+    
+    return request<any[]>(url, {
+      method: 'GET',
+    }, true);
+  },
+
+  deleteLegalDocument: async (id: string) => {
+    return request<any>(`/Documents/${id}`, {
+      method: 'DELETE',
     }, true);
   },
 };

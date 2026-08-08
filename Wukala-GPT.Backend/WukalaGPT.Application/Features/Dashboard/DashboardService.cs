@@ -26,7 +26,7 @@ public class DashboardService : IDashboardService
 
         // 1. Stats
         var activeCasesCount = await _context.LegalCases.AsNoTracking()
-            .CountAsync(c => c.LeadLawyerId == lawyerId && c.Status != WukalaGPT.Domain.Enums.CaseStatus.Closed);
+            .CountAsync(c => c.LeadLawyerId == lawyerId && c.Status != WukalaGPT.Domain.Enums.CaseStatus.Closed && !c.IsArchived);
 
         var totalClientsCount = await _context.Clients.AsNoTracking()
             .CountAsync(c => c.LawyerId == lawyerId);
@@ -67,7 +67,7 @@ public class DashboardService : IDashboardService
         // 3. Recent Cases
         var recentCasesRaw = await _context.LegalCases.AsNoTracking()
             .Include(c => c.Client)
-            .Where(c => c.LeadLawyerId == lawyerId)
+            .Where(c => c.LeadLawyerId == lawyerId && !c.IsArchived)
             .OrderByDescending(c => c.CreatedAt)
             .Take(5)
             .Select(c => new
@@ -90,7 +90,8 @@ public class DashboardService : IDashboardService
 
         // 4. Upcoming Hearings
         var upcomingHearingsRaw = await _context.Hearings.AsNoTracking()
-            .Where(h => h.LeadLawyerId == lawyerId && h.HearingDate >= dateNow && h.Status == "Scheduled")
+            .Include(h => h.Case)
+            .Where(h => h.LeadLawyerId == lawyerId && h.HearingDate >= dateNow && h.Status == "Scheduled" && (h.Case == null || !h.Case.IsArchived))
             .OrderBy(h => h.HearingDate)
             .Take(5)
             .Select(h => new

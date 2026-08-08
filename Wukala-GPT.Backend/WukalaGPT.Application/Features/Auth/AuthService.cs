@@ -31,7 +31,7 @@ public class AuthService : IAuthService
         _cache = cache;
     }
 
-    public async Task<AuthResponseDto> RegisterClientAsync(RegisterClientDto dto)
+    public async Task<AuthResponseDto> RegisterClientAsync(RegisterClientDto dto, string? ipAddress = null, string? userAgent = null)
     {
         if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
             throw new Exception("Email already exists.");
@@ -66,12 +66,13 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync(default);
         
         // Enterprise level: Offload email to background job for instant response
-        BackgroundJob.Enqueue(() => _emailService.SendEmailAsync(user.Email, "Your Verification Code - Wukala GPT", $"Your OTP code is: <b>{otp}</b>. It is valid for 10 minutes."));
+        var emailHtml = GenerateProfessionalOtpEmail(firstName, otp, ipAddress, userAgent);
+        BackgroundJob.Enqueue(() => _emailService.SendEmailAsync(user.Email, "Your Verification Code - Wukala GPT", emailHtml));
 
         return new AuthResponseDto { Token = "", Message = "Client registered successfully. Please verify OTP sent to your email." };
     }
 
-    public async Task<AuthResponseDto> RegisterLawyerAsync(RegisterLawyerDto dto)
+    public async Task<AuthResponseDto> RegisterLawyerAsync(RegisterLawyerDto dto, string? ipAddress = null, string? userAgent = null)
     {
         if (await _context.Users.AnyAsync(u => u.Email == dto.Email))
             throw new Exception("Email already exists.");
@@ -121,7 +122,9 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync(default);
         
         // Enterprise level: Offload email to background job for instant response
-        BackgroundJob.Enqueue(() => _emailService.SendEmailAsync(user.Email, "Your Verification Code - Wukala GPT", $"Your OTP code is: <b>{otp}</b>. It is valid for 10 minutes."));
+        var firstName = names.Length > 0 ? names[0] : string.Empty;
+        var emailHtml = GenerateProfessionalOtpEmail(firstName, otp, ipAddress, userAgent);
+        BackgroundJob.Enqueue(() => _emailService.SendEmailAsync(user.Email, "Your Verification Code - Wukala GPT", emailHtml));
 
         return new AuthResponseDto { Token = "", Message = "Lawyer registered successfully. Please verify OTP sent to your email." };
     }
@@ -139,7 +142,7 @@ public class AuthService : IAuthService
         return new AuthResponseDto { Token = token, Message = "Login successful." };
     }
 
-    public async Task ResendOtpAsync(ResendOtpDto dto)
+    public async Task ResendOtpAsync(ResendOtpDto dto, string? ipAddress = null, string? userAgent = null)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
         if (user == null)
@@ -154,7 +157,8 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync(default);
         
         // Enterprise level: Offload email to background job for instant response
-        BackgroundJob.Enqueue(() => _emailService.SendEmailAsync(user.Email, "Your Verification Code - Wukala GPT", $"Your OTP code is: <b>{user.OtpCode}</b>. It is valid for 10 minutes."));
+        var emailHtml = GenerateProfessionalOtpEmail(user.FirstName, user.OtpCode, ipAddress, userAgent);
+        BackgroundJob.Enqueue(() => _emailService.SendEmailAsync(user.Email, "Your Verification Code - Wukala GPT", emailHtml));
     }
 
     public async Task<AuthResponseDto> VerifyOtpAsync(VerifyOtpDto dto)
@@ -252,5 +256,74 @@ public class AuthService : IAuthService
             AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(7) // Match JWT expiration
         };
         await _cache.SetStringAsync($"Blacklist_{token}", "true", options);
+    }
+
+    private string GenerateProfessionalOtpEmail(string name, string otp, string? ipAddress, string? userAgent)
+    {
+        var refId = Guid.NewGuid().ToString("N").Substring(0, 10).ToUpper();
+        var time = DateTime.UtcNow.ToString("f") + " UTC";
+        var ip = string.IsNullOrEmpty(ipAddress) ? "Unknown" : ipAddress;
+        var os = string.IsNullOrEmpty(userAgent) ? "Unknown Device" : userAgent;
+
+        return $@"
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='utf-8'>
+            <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+            <title>Verification Code - Wukala GPT</title>
+            <style>
+                body {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; color: #333333; }}
+                .container {{ max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }}
+                .header {{ background-color: #1a365d; padding: 30px; text-align: center; border-bottom: 4px solid #c5a963; }}
+                .header h1 {{ margin: 0; color: #ffffff; font-size: 24px; font-weight: 600; letter-spacing: 0.5px; }}
+                .header p {{ margin: 5px 0 0 0; color: #e2e8f0; font-size: 14px; opacity: 0.9; }}
+                .content {{ padding: 40px 30px; }}
+                .greeting {{ font-size: 18px; font-weight: 600; margin-bottom: 20px; color: #2d3748; }}
+                .otp-box {{ background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 25px; text-align: center; margin: 30px 0; }}
+                .otp-code {{ font-size: 36px; font-weight: 700; color: #1a365d; letter-spacing: 6px; margin: 0; }}
+                .otp-note {{ font-size: 13px; color: #718096; margin-top: 10px; }}
+                .security-info {{ margin-top: 40px; padding-top: 20px; border-top: 1px solid #edf2f7; font-size: 12px; color: #a0aec0; }}
+                .security-info strong {{ color: #718096; font-weight: 600; }}
+                .security-info ul {{ list-style: none; padding: 0; margin: 10px 0 0 0; }}
+                .security-info li {{ margin-bottom: 6px; }}
+                .footer {{ background-color: #f8fafc; padding: 20px 30px; text-align: center; font-size: 12px; color: #a0aec0; border-top: 1px solid #edf2f7; }}
+                .footer a {{ color: #c5a963; text-decoration: none; font-weight: 600; }}
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <h1>WUKALA GPT</h1>
+                    <p>Mizan.AI - Enterprise Legal Intelligence</p>
+                </div>
+                <div class='content'>
+                    <div class='greeting'>Hello {name},</div>
+                    <p>You recently requested to sign in or register with Wukala GPT. Use the verification code below to securely complete your request.</p>
+                    
+                    <div class='otp-box'>
+                        <div class='otp-code'>{otp}</div>
+                        <div class='otp-note'>This code will expire in 10 minutes.</div>
+                    </div>
+                    
+                    <p style='font-size: 14px; color: #4a5568; line-height: 1.6;'>If you did not request this code, you can safely ignore this email. Someone else might have typed your email address by mistake.</p>
+                    
+                    <div class='security-info'>
+                        <strong>Security Information</strong>
+                        <ul>
+                            <li><strong>Time:</strong> {time}</li>
+                            <li><strong>IP Address:</strong> {ip}</li>
+                            <li><strong>Device / OS:</strong> {os}</li>
+                            <li><strong>Reference ID:</strong> {refId}</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class='footer'>
+                    <p>&copy; {DateTime.UtcNow.Year} Code Envision Technologies. All rights reserved.</p>
+                    <p>Secure Legal Intelligence Platform | <a href='https://www.wukala-gpt.app/privacy'>Privacy Policy</a></p>
+                </div>
+            </div>
+        </body>
+        </html>";
     }
 }

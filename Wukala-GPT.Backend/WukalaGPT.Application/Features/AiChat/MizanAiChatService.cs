@@ -40,6 +40,18 @@ public class MizanAiChatService : IMizanAiChatService
         };
     }
 
+    public async Task UpdateSessionTitleAsync(Guid userId, Guid sessionId, string newTitle)
+    {
+        var session = await _context.AiChatSessions
+            .FirstOrDefaultAsync(s => s.Id == sessionId && s.UserId == userId);
+
+        if (session == null)
+            throw new UnauthorizedAccessException("Session not found or access denied.");
+
+        session.Title = newTitle;
+        await _context.SaveChangesAsync(default);
+    }
+
     public async Task<IEnumerable<AiChatSessionDto>> GetUserSessionsAsync(Guid userId)
     {
         return await _context.AiChatSessions
@@ -153,6 +165,77 @@ public class MizanAiChatService : IMizanAiChatService
         };
     }
 
+    public async Task<AiChatResponseDto> SendMultimodalMessageAsync(Guid userId, AiChatMultimodalRequestDto request)
+    {
+        Guid sessionId;
+
+        if (request.SessionId.HasValue)
+        {
+            var session = await _context.AiChatSessions
+                .FirstOrDefaultAsync(s => s.Id == request.SessionId.Value && s.UserId == userId);
+                
+            if (session == null)
+                throw new UnauthorizedAccessException("Session not found or access denied.");
+                
+            sessionId = session.Id;
+            session.LastMessageAt = DateTime.UtcNow;
+        }
+        else
+        {
+            var session = new AiChatSession
+            {
+                UserId = userId,
+                Title = string.IsNullOrWhiteSpace(request.Message) ? (request.Files.Count > 0 ? "Multimodal Chat" : "New Chat") : 
+                        (request.Message.Length > 30 ? request.Message.Substring(0, 30) + "..." : request.Message)
+            };
+            _context.AiChatSessions.Add(session);
+            await _context.SaveChangesAsync(default);
+            sessionId = session.Id;
+        }
+
+        // Save User Query
+        var userMessage = new AiChatMessage
+        {
+            SessionId = sessionId,
+            Role = AiMessageRole.User,
+            Content = string.IsNullOrWhiteSpace(request.Message) && request.Files.Count > 0 ? $"[Uploaded {request.Files.Count} files]" : request.Message,
+            IsDeepResearch = request.IsDeepResearch,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.AiChatMessages.Add(userMessage);
+        await _context.SaveChangesAsync(default);
+
+        var startTime = System.Diagnostics.Stopwatch.GetTimestamp();
+
+        // Call Mizan AI via Backend Client
+        var mizanResponse = await _mizanClient.SendMultimodalMessageAsync(
+            request.Message,
+            request.IsDeepResearch,
+            sessionId.ToString(),
+            request.Files
+        );
+        
+        var processingTime = System.Diagnostics.Stopwatch.GetElapsedTime(startTime).TotalMilliseconds;
+
+        // Save Assistant Response
+        var assistantMessage = new AiChatMessage
+        {
+            SessionId = sessionId,
+            Role = AiMessageRole.Assistant,
+            Content = mizanResponse.response,
+            IsDeepResearch = request.IsDeepResearch,
+            ProcessingTimeMs = (long)processingTime,
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.AiChatMessages.Add(assistantMessage);
+        await _context.SaveChangesAsync(default);
+
+        return new AiChatResponseDto
+        {
+            Response = mizanResponse.response
+        };
+    }
+
     public async Task DeleteSessionAsync(Guid userId, Guid sessionId)
     {
         var session = await _context.AiChatSessions
@@ -163,5 +246,10 @@ public class MizanAiChatService : IMizanAiChatService
 
         _context.AiChatSessions.Remove(session);
         await _context.SaveChangesAsync(default);
+    }
+
+    public async Task<Stream> GenerateTtsAsync(string text)
+    {
+        return await _mizanClient.GenerateTtsAsync(text);
     }
 }

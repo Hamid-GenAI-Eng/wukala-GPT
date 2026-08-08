@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # ==========================================
+  # Wukala-GPT Backend Services (.NET)
+  # ==========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: wukala_postgres_local
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: u6mJQUA2
+      POSTGRES_DB: WukalaGPT
+    ports:
+      - "5432:5432"
+    volumes:
+      - wukala_pgdata_local:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: wukala_redis_local
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  wukala-api:
+    build: 
+      context: ./Wukala-GPT.Backend
+      dockerfile: Dockerfile
+    image: wukala_api_local
+    container_name: wukala_api
+    ports:
+      - "5285:8080" # Maps the Dockerized port 8080 to host port 5285 so the React Frontend connects seamlessly
+    env_file:
+      - ./Wukala-GPT.Backend/.env
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      # Override the appsettings.json connection strings to use the Docker network hostnames
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=WukalaGPT;Username=postgres;Password=u6mJQUA2;Pooling=true;Maximum Pool Size=500;Minimum Pool Size=5;
+      - ConnectionStrings__Redis=redis:6379,abortConnect=false
+      - MizanAi__BaseUrl=http://mizan-api:8000
+    depends_on:
+      - postgres
+      - redis
+      - mizan-api
+    restart: unless-stopped
+
+  # ==========================================
+  # Mizan AI Services (Python)
+  # ==========================================
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: mizan_qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./Mizan.AI/qdrant_storage:/qdrant/storage
+    restart: unless-stopped
+
+  mizan-api:
+    build: 
+      context: ./Mizan.AI
+      dockerfile: Dockerfile
+    image: mizan_api_local
+    container_name: mizan_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./Mizan.AI:/app
+      - mizan_hf_cache:/root/.cache/huggingface
+    depends_on:
+      - qdrant
+    env_file:
+      - ./Mizan.AI/.env
+    environment:
+      - QDRANT_HOST=qdrant
+    restart: unless-stopped
+
+volumes:
+  wukala_pgdata_local:
+  mizan_hf_cache:

@@ -9,3 +9,12 @@ class GraphState(TypedDict):
     summary: str
     deep_research_iterations: int
     is_deep_research: bool
+    refined_query: str
+    security_status: str
+    canned_response: str
+    analysis_draft: str
+    citations: str
+    risk_flags: str
+    reviewer_feedback: str
+    reviewer_decision: str
+    review_iterations: int

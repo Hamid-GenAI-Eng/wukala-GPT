@@ -155,6 +155,47 @@ public class BillingService : IBillingService
             .Where(t => t.LawyerId == lawyerId)
             .ToListAsync();
 
+        if (!templates.Any())
+        {
+            return new List<BillingTemplateDto>
+            {
+                new BillingTemplateDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Standard Legal Consultation",
+                    Category = "Consultation",
+                    Description = "Standard one hour legal consultation.",
+                    Items = new List<InvoiceItemDto>
+                    {
+                        new InvoiceItemDto { Description = "Legal Consultation Fee", Rate = 15000, Hours = 1, Amount = 15000 }
+                    }
+                },
+                new BillingTemplateDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Contract Drafting",
+                    Category = "Drafting",
+                    Description = "Drafting of standard legal agreements.",
+                    Items = new List<InvoiceItemDto>
+                    {
+                        new InvoiceItemDto { Description = "Document Drafting", Rate = 25000, Hours = 1, Amount = 25000 },
+                        new InvoiceItemDto { Description = "Review & Revisions", Rate = 10000, Hours = 1, Amount = 10000 }
+                    }
+                },
+                new BillingTemplateDto
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Court Appearance",
+                    Category = "Litigation",
+                    Description = "Fee for representing the client in court proceedings.",
+                    Items = new List<InvoiceItemDto>
+                    {
+                        new InvoiceItemDto { Description = "Court Appearance Fee", Rate = 50000, Hours = 1, Amount = 50000 }
+                    }
+                }
+            };
+        }
+
         return templates.Select(t => new BillingTemplateDto
         {
             Id = t.Id,
@@ -166,7 +207,9 @@ public class BillingService : IBillingService
             Items = t.Items.Select(i => new InvoiceItemDto
             {
                 Description = i.Description,
-                Rate = i.Rate
+                Rate = i.Rate,
+                Hours = 1,
+                Amount = i.Rate
             }).ToList()
         }).ToList();
     }

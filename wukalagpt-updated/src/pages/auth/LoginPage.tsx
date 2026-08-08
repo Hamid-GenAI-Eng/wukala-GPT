@@ -80,9 +80,6 @@ const LoginPage = () => {
           description: `Signed in as ${userData.name}`,
         });
 
-        // Reset onboarding for normal users (show tour on login)
-        localStorage.removeItem('wukala_onboarding_completed');
-
         // Navigate based on user role
         if (userData.role === 'admin') {
           navigate('/admin');

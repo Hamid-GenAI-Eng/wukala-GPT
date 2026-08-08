@@ -14,11 +14,23 @@ public static class ExceptionMiddlewareExtensions
                 var contextFeature = context.Features.Get<IExceptionHandlerFeature>();
                 if(contextFeature != null)
                 {
-                    // Basic generic error response
+                    var error = contextFeature.Error;
+                    
+                    int statusCode = error switch
+                    {
+                        KeyNotFoundException => StatusCodes.Status404NotFound,
+                        UnauthorizedAccessException => StatusCodes.Status403Forbidden,
+                        ArgumentException or InvalidOperationException => StatusCodes.Status400BadRequest,
+                        _ => StatusCodes.Status500InternalServerError
+                    };
+
+                    context.Response.StatusCode = statusCode;
+
                     await context.Response.WriteAsJsonAsync(new 
                     {
-                        StatusCode = context.Response.StatusCode,
-                        Message = "Internal Server Error."
+                        StatusCode = statusCode,
+                        Message = statusCode == 500 ? "Internal Server Error" : error.Message,
+                        Detail = statusCode == 500 ? error.Message : null
                     });
                 }
             });

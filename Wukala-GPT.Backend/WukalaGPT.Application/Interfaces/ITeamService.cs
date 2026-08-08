@@ -16,4 +16,7 @@ public interface ITeamService
     
     Task<List<FirmActivityLogDto>> GetRecentActivityAsync(Guid firmId, int count = 20);
     Task LogActivityAsync(Guid firmId, Guid userId, string action, string target, WukalaGPT.Domain.Enums.FirmActivityType type);
+    Task<List<FirmCalendarEventDto>> GetFirmCalendarAsync(Guid firmId);
+    Task UpdateMemberRoleAsync(Guid firmId, Guid memberId, string newRole);
+    Task RemoveMemberAsync(Guid firmId, Guid memberId);
 }

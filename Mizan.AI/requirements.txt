@@ -12,8 +12,15 @@ python-jose[cryptography]
 bcrypt
 python-multipart
 python-dotenv
-FlagEmbedding
-torch
+fastembed
 python-docx
 markdown2
 langgraph-checkpoint-sqlite
+streamlit
+edge-tts
+ragas
+datasets
+pytest
+pytest-asyncio
+pytest-xdist
+beautifulsoup4

@@ -42,8 +42,10 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
         services.AddScoped<IFileStorageService, CloudinaryService>();
         services.AddScoped<IEmailService, ResendEmailService>();
-        
-        services.AddHttpClient<IMizanAiClient, MizanAiClient>();
+        services.AddHttpClient<IMizanAiClient, MizanAiClient>(client =>
+        {
+            client.Timeout = TimeSpan.FromMinutes(5);
+        });
         
         services.AddOptions();
         services.AddHttpClient<ResendClient>();

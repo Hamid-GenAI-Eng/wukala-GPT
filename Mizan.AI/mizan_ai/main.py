@@ -20,11 +20,13 @@ app.add_middleware(
 def health_check():
     return {"status": "healthy", "project": settings.PROJECT_NAME}
 
-from mizan_ai.api.routes import chat, documents, auth, drafting
+from mizan_ai.api.routes import chat, documents, auth, drafting, case_intelligence, virtual_munshi
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(chat.router, prefix=f"{settings.API_V1_STR}/chat", tags=["chat"])
 app.include_router(documents.router, prefix=f"{settings.API_V1_STR}/documents", tags=["documents"])
 app.include_router(drafting.router, prefix=f"{settings.API_V1_STR}/drafting", tags=["drafting"])
+app.include_router(case_intelligence.router, prefix=f"{settings.API_V1_STR}/case-intelligence", tags=["case_intelligence"])
+app.include_router(virtual_munshi.router, prefix=f"{settings.API_V1_STR}/munshi", tags=["virtual_munshi"])
 
 if __name__ == "__main__":
     import uvicorn

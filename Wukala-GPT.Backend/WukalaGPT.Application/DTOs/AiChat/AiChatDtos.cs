@@ -40,3 +40,19 @@ public class AiChatSessionDto
     public DateTime StartedAt { get; set; }
     public DateTime LastMessageAt { get; set; }
 }
+
+public class MultimodalFileDto
+{
+    public string FileName { get; set; } = string.Empty;
+    public string ContentType { get; set; } = string.Empty;
+    public Stream? ContentStream { get; set; }
+    public byte[] ContentBytes { get; set; } = Array.Empty<byte>();
+}
+
+public class AiChatMultimodalRequestDto
+{
+    public string Message { get; set; } = string.Empty;
+    public bool IsDeepResearch { get; set; }
+    public Guid? SessionId { get; set; }
+    public List<MultimodalFileDto> Files { get; set; } = new();
+}

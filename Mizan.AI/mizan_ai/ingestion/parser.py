@@ -20,8 +20,8 @@ def extract_text_from_pdf(file_path: str) -> str:
         logger.error(f"Error extracting text from {file_path}: {e}")
         return ""
 
-def process_and_ingest_document(file_path: str, filename: str):
-    logger.info(f"Starting processing for {filename}")
+def extract_chunks_from_document(file_path: str, filename: str) -> list[dict]:
+    logger.info(f"Extracting text and chunking {filename}")
     
     text_content = ""
     if filename.lower().endswith('.pdf'):
@@ -32,14 +32,14 @@ def process_and_ingest_document(file_path: str, filename: str):
                 text_content = f.read()
         except Exception as e:
             logger.error(f"Error reading txt file {file_path}: {e}")
-            return
+            return []
     else:
         logger.warning(f"Unsupported file format: {filename}")
-        return
+        return []
 
     if not text_content.strip():
         logger.warning(f"No text extracted from {filename}")
-        return
+        return []
     
     # Try to extract citation if available in filename or text
     citation_match = re.search(r'(PLD|SCMR|PCrLJ|YLR|CLC)\s*\d+\s*[A-Za-z]+\s*\d+', text_content[:1000])
@@ -55,21 +55,33 @@ def process_and_ingest_document(file_path: str, filename: str):
     # Chunking
     chunks = chunk_text(text_content, metadata)
     
-    # Embedding and Upserting
-    for chunk in chunks:
-        vectors = embedding_service.embed_text(chunk["text"])
-        point_id = str(uuid.uuid4())
-        
-        qdrant_service.upsert_document(
-            point_id=point_id,
-            dense_vector=vectors["dense"],
-            sparse_vector=vectors["sparse"],
-            payload={
+    result = []
+    for idx, chunk in enumerate(chunks):
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{filename}_{idx}"))
+        result.append({
+            "point_id": point_id,
+            "text": chunk["text"],
+            "payload": {
                 "text": chunk["text"],
                 "citation": metadata["citation"],
                 "court": metadata["court"],
                 "source_file": filename
             }
-        )
+        })
         
-    logger.info(f"Finished ingesting {filename} into Qdrant.")
+    return result
+
+def process_and_ingest_document(file_path: str, filename: str):
+    chunks = extract_chunks_from_document(file_path, filename)
+    if not chunks:
+        logger.warning(f"No chunks to ingest for {filename}")
+        return
+        
+    texts = [c["text"] for c in chunks]
+    payloads = [c["payload"] for c in chunks]
+    ids = [c["point_id"] for c in chunks]
+    
+    # Embed and upsert directly since this is an on-the-fly request
+    dense_embeddings, sparse_embeddings = embedding_service.embed_texts(texts)
+    qdrant_service.upsert_documents(ids, dense_embeddings, sparse_embeddings, payloads)
+    logger.info(f"Successfully processed and ingested {len(chunks)} chunks for {filename}")

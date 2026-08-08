@@ -102,7 +102,7 @@ public class GetCaseDetailsQueryHandler : IRequestHandler<GetCaseDetailsQuery, C
             .FirstOrDefaultAsync(c => c.Id == request.CaseId && !c.IsArchived, cancellationToken);
 
         if (caseEntity == null)
-            throw new Exception("Case not found or archived.");
+            throw new KeyNotFoundException("Case not found or archived.");
 
         // Security check: Only assigned team members or lead lawyer can view full details
         if (caseEntity.LeadLawyerId != request.RequesterUserId && !caseEntity.Assignments.Any(a => a.UserId == request.RequesterUserId))

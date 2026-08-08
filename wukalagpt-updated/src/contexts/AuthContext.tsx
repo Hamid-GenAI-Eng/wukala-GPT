@@ -100,12 +100,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshUser = async () => {
     try {
+      if (!sessionStorage.getItem('auth_token') && !localStorage.getItem('auth_token')) return;
       const userData = await api.getProfile();
       setUser(userData);
     } catch (error) {
       console.error('AuthContext: Failed to refresh user profile:', error);
     }
   };
+
+  useEffect(() => {
+    const handleGlobalMutation = () => {
+      // Small debounce mechanism could be added here if needed, but direct call is fine for now
+      refreshUser();
+    };
+
+    window.addEventListener('WukalaMutation', handleGlobalMutation);
+    return () => window.removeEventListener('WukalaMutation', handleGlobalMutation);
+  }, []);
 
   const login = (userData: User) => {
     setUser(userData);
@@ -114,8 +125,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = () => {
     setUser(null);
     setToken(null);
-    // Clear onboarding flag so it shows again on next login
-    localStorage.removeItem('wukala_onboarding_completed');
   };
 
   const isAuthenticated = !!user;

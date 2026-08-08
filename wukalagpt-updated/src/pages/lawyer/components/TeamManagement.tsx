@@ -43,6 +43,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 
 // ── Types ──
 interface TeamMember {
@@ -180,39 +188,57 @@ export default function TeamManagement() {
   const [members, setMembers] = useState<any[]>([]);
   const [allTasks, setAllTasks] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
+  const [calendar, setCalendar] = useState<any[]>([]);
+
+  // Task Assign Form State
+  const [assignTaskOpen, setAssignTaskOpen] = useState(false);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskAssignedTo, setTaskAssignedTo] = useState('');
+  const [taskDueDate, setTaskDueDate] = useState('');
+  const [taskPriority, setTaskPriority] = useState<'High' | 'Medium' | 'Low'>('Medium');
+  const [taskType, setTaskType] = useState<'Research' | 'Drafting' | 'Case Prep' | 'Filing'>('Research');
+  const [assigningTask, setAssigningTask] = useState(false);
 
   useEffect(() => {
     async function loadTeamData() {
       try {
         setLoading(true);
-        const [membersRes, tasksRes, activitiesRes] = await Promise.allSettled([
+        const [membersRes, tasksRes, activitiesRes, calendarRes] = await Promise.allSettled([
           api.getTeamMembers(),
           api.getTeamTasks(),
-          api.getTeamActivity()
+          api.getTeamActivity(),
+          api.getFirmCalendar()
         ]);
 
-        if (membersRes.status === 'fulfilled' && membersRes.value && membersRes.value.length > 0) {
+        if (membersRes.status === 'fulfilled' && membersRes.value) {
           setMembers(membersRes.value);
         } else {
-          setMembers(teamMembers);
+          setMembers([]);
         }
 
-        if (tasksRes.status === 'fulfilled' && tasksRes.value && tasksRes.value.length > 0) {
+        if (tasksRes.status === 'fulfilled' && tasksRes.value) {
           setAllTasks(tasksRes.value);
         } else {
-          setAllTasks(tasks);
+          setAllTasks([]);
         }
 
-        if (activitiesRes.status === 'fulfilled' && activitiesRes.value && activitiesRes.value.length > 0) {
+        if (activitiesRes.status === 'fulfilled' && activitiesRes.value) {
           setActivities(activitiesRes.value);
         } else {
-          setActivities(activityLogs);
+          setActivities([]);
+        }
+
+        if (calendarRes.status === 'fulfilled' && calendarRes.value) {
+          setCalendar(calendarRes.value);
+        } else {
+          setCalendar([]);
         }
       } catch (err) {
-        console.error("Failed to fetch team details from backend. Reverting to elegant mockups", err);
-        setMembers(teamMembers);
-        setAllTasks(tasks);
-        setActivities(activityLogs);
+        console.error("Failed to fetch team details from backend.", err);
+        setMembers([]);
+        setAllTasks([]);
+        setActivities([]);
+        setCalendar([]);
       } finally {
         setLoading(false);
       }
@@ -246,6 +272,72 @@ export default function TeamManagement() {
       });
     } finally {
       setInviting(false);
+    }
+  };
+
+  const handleAssignTask = async () => {
+    if (!taskTitle || !taskAssignedTo || !taskDueDate) return;
+    try {
+      setAssigningTask(true);
+      await api.createTeamTask({
+        title: taskTitle,
+        assignedTo: taskAssignedTo,
+        dueDate: new Date(taskDueDate).toISOString(),
+        priority: taskPriority,
+        type: taskType
+      });
+      setAssignTaskOpen(false);
+      setTaskTitle('');
+      setTaskAssignedTo('');
+      
+      const updatedTasks = await api.getTeamTasks();
+      if (updatedTasks && updatedTasks.length > 0) {
+        setAllTasks(updatedTasks);
+      }
+      toast({ title: "Success", description: "Task assigned successfully." });
+    } catch (err: any) {
+      toast({ title: "Task Assignment Failed", description: err.message || "Something went wrong.", variant: "destructive" });
+    } finally {
+      setAssigningTask(false);
+    }
+  };
+
+  const handleUpdateTaskStatus = async (taskId: string, status: string) => {
+    try {
+      await api.updateTeamTaskStatus(taskId, status);
+      const updatedTasks = await api.getTeamTasks();
+      if (updatedTasks && updatedTasks.length > 0) {
+        setAllTasks(updatedTasks);
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleUpdateRole = async (memberId: string, role: string) => {
+    try {
+      await api.updateTeamMemberRole(memberId, role);
+      const updatedMembers = await api.getTeamMembers();
+      if (updatedMembers && updatedMembers.length > 0) setMembers(updatedMembers);
+      toast({ title: "Success", description: "Role updated successfully." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    if (!confirm("Are you sure you want to remove this member?")) return;
+    try {
+      await api.removeTeamMember(memberId);
+      const updatedMembers = await api.getTeamMembers();
+      if (updatedMembers && updatedMembers.length > 0) {
+        setMembers(updatedMembers);
+      } else {
+        setMembers([]);
+      }
+      toast({ title: "Success", description: "Member removed successfully." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
@@ -386,9 +478,21 @@ export default function TeamManagement() {
                           <p className="text-sm font-bold font-sans text-gold">{member.tasksPending}</p>
                           <p className="text-[10px] text-muted-foreground font-sans">Pending</p>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-                          <MoreVertical className="h-3.5 w-3.5" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                              <MoreVertical className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Manage Role</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => handleUpdateRole(member.userId || member.id, 'Administrator')}>Make Administrator</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleUpdateRole(member.userId || member.id, 'Junior Lawyer')}>Make Junior Lawyer</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleUpdateRole(member.userId || member.id, 'Clerk')}>Make Clerk</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleRemoveMember(member.userId || member.id)}>Remove Member</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   </CardContent>
@@ -409,9 +513,59 @@ export default function TeamManagement() {
                   </Button>
                 ))}
               </div>
-              <Button size="sm" className="bg-gradient-primary font-sans text-xs gap-1.5 h-8">
-                <Plus className="h-3 w-3" /> Assign Task
-              </Button>
+              <Dialog open={assignTaskOpen} onOpenChange={setAssignTaskOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="bg-gradient-primary font-sans text-xs gap-1.5 h-8">
+                    <Plus className="h-3 w-3" /> Assign Task
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="font-sans text-foreground">Assign New Task</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 mt-2">
+                    <div>
+                      <label className="text-xs font-sans text-muted-foreground">Task Title</label>
+                      <Input value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="e.g. Research case law" className="mt-1 text-sm font-sans" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-sans text-muted-foreground">Assign To</label>
+                      <select value={taskAssignedTo} onChange={e => setTaskAssignedTo(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1 font-sans">
+                        <option value="">Select a member</option>
+                        {members.map(m => (
+                          <option key={m.userId || m.id} value={m.name}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-sans text-muted-foreground">Due Date</label>
+                        <Input type="date" value={taskDueDate} onChange={e => setTaskDueDate(e.target.value)} className="mt-1 text-sm font-sans" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-sans text-muted-foreground">Priority</label>
+                        <select value={taskPriority} onChange={e => setTaskPriority(e.target.value as any)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1 font-sans">
+                          <option value="High">High</option>
+                          <option value="Medium">Medium</option>
+                          <option value="Low">Low</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-sans text-muted-foreground">Type</label>
+                      <select value={taskType} onChange={e => setTaskType(e.target.value as any)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 mt-1 font-sans">
+                        <option value="Research">Research</option>
+                        <option value="Drafting">Drafting</option>
+                        <option value="Case Prep">Case Prep</option>
+                        <option value="Filing">Filing</option>
+                      </select>
+                    </div>
+                    <Button onClick={handleAssignTask} disabled={assigningTask || !taskTitle || !taskAssignedTo || !taskDueDate} className="w-full bg-gradient-primary font-sans text-sm gap-2 mt-2">
+                      {assigningTask ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Create Task
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
 
             <div className="space-y-2">
@@ -435,9 +589,19 @@ export default function TeamManagement() {
                             <Clock className="h-3 w-3 inline mr-0.5" /> Due: {new Date(task.dueDate).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </p>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-                          <MoreVertical className="h-3.5 w-3.5" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                              <MoreVertical className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Update Status</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => handleUpdateTaskStatus(task.id, 'Pending')}>Mark Pending</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleUpdateTaskStatus(task.id, 'In Progress')}>Mark In Progress</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleUpdateTaskStatus(task.id, 'Completed')}>Mark Completed</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </CardContent>
                   </Card>
@@ -487,7 +651,7 @@ export default function TeamManagement() {
                   <Badge variant="secondary" className="text-[10px] font-sans">{firmCalendar.length} hearings today</Badge>
                 </div>
                 <div className="space-y-2">
-                  {firmCalendar.map((h, i) => (
+                  {calendar.map((h, i) => (
                     <div key={i} className="flex items-center gap-3 p-3 rounded-lg border border-border/50 hover:bg-secondary/30 transition-colors">
                       <div className={`h-10 w-1 rounded-full ${h.color} shrink-0`} />
                       <div className="text-center shrink-0 w-16">

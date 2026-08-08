@@ -17,7 +17,7 @@ class LLMService:
             temperature=0.1
         )
         
-        # Reasoner/Deep model
+        # Reasoner/Deep model with native chain-of-thought (Fallback to Llama-3.3-70b due to DeepSeek removal)
         self.reasoning_llm = ChatGroq(
             api_key=api_key,
             model_name="llama-3.3-70b-versatile",

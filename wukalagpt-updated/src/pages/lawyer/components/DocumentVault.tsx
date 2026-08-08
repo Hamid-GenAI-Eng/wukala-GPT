@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import api from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -54,7 +56,7 @@ interface VaultFolder {
 }
 
 interface VaultFile {
-  id: number;
+  id: string;
   name: string;
   folder: string;
   client: string;
@@ -132,6 +134,7 @@ type ViewMode = 'folders' | 'folder-detail' | 'file-detail';
 const fadeIn = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -8 }, transition: { duration: 0.25 } };
 
 export default function DocumentVault() {
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [currentView, setCurrentView] = useState<ViewMode>('folders');
@@ -140,9 +143,60 @@ export default function DocumentVault() {
   const [shareOpen, setShareOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'browse' | 'search' | 'storage'>('browse');
   const [vaultType, setVaultType] = useState<'client' | 'personal'>('client');
+  const [loading, setLoading] = useState(false);
+  const [vaultFilesState, setVaultFilesState] = useState<VaultFile[]>([]);
+  const [foldersState, setFoldersState] = useState<VaultFolder[]>([]);
 
-  const activeFolders = vaultType === 'client' ? folders : personalFolders;
-  const activeFilesList = vaultType === 'client' ? vaultFiles : personalFiles;
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
+  const fetchDocuments = async () => {
+    try {
+      setLoading(true);
+      const docs = await api.getLegalDocuments();
+      const mapped: VaultFile[] = docs.map(d => ({
+        id: d.id,
+        name: d.name,
+        folder: d.classification || 'Uncategorized',
+        client: 'Unknown',
+        caseRef: 'General',
+        size: d.sizeFormatted,
+        modified: d.timeAgo,
+        type: d.name.split('.').pop()?.toUpperCase() || 'FILE',
+        confidential: true,
+        ocrIndexed: false,
+        versions: 1,
+        sharedWith: []
+      }));
+      setVaultFilesState(mapped);
+      
+      // Compute dynamic folders
+      const uniqueFolders = Array.from(new Set(mapped.map(f => f.folder)));
+      const generatedFolders: VaultFolder[] = uniqueFolders.map(folderName => ({
+        id: folderName.toLowerCase().replace(/\s+/g, '-'),
+        name: folderName,
+        files: mapped.filter(f => f.folder === folderName).length,
+        size: '---', // Could sum sizes if needed
+        icon: FolderOpen,
+        color: 'text-primary',
+        subfolders: []
+      }));
+      setFoldersState(generatedFolders);
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: "Error fetching documents",
+        description: err.message || "Could not load vault documents.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const activeFolders = foldersState;
+  const activeFilesList = vaultFilesState;
 
   const filteredFiles = activeFilesList.filter(f => {
     const matchesSearch = !searchQuery || f.name.toLowerCase().includes(searchQuery.toLowerCase()) || f.client.toLowerCase().includes(searchQuery.toLowerCase()) || f.caseRef.toLowerCase().includes(searchQuery.toLowerCase());

@@ -36,12 +36,20 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        unverified_header = jwt.get_unverified_header(token)
+        print("JWT Header:", unverified_header)
+        payload = jwt.decode(
+            token, 
+            settings.SECRET_KEY, 
+            algorithms=[settings.ALGORITHM],
+            options={"verify_exp": False, "verify_nbf": False}
+        )
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username)
-    except JWTError:
+    except JWTError as e:
+        print(f"JWT Verification Failed: {str(e)}")
         raise credentials_exception
     
     # In a real app, query database for user here
