@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.RateLimiting;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -6,11 +7,15 @@ using Microsoft.AspNetCore.Mvc;
 using WukalaGPT.Application.DTOs.VirtualMunshi;
 using System.Security.Claims;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 [Authorize]
+    [EnableRateLimiting("AiLimiter")]
 public class VirtualMunshiController : ControllerBase
 {
     private readonly HttpClient _httpClient;

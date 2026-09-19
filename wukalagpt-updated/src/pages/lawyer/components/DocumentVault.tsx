@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
@@ -134,6 +135,8 @@ type ViewMode = 'folders' | 'folder-detail' | 'file-detail';
 const fadeIn = { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -8 }, transition: { duration: 0.25 } };
 
 export default function DocumentVault() {
+  const { type, id } = useParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
@@ -150,6 +153,28 @@ export default function DocumentVault() {
   useEffect(() => {
     fetchDocuments();
   }, []);
+
+  useEffect(() => {
+    if (type && id) {
+      if (type === 'folder') {
+        const folder = foldersState.find(f => f.id === id);
+        if (folder) {
+          setSelectedFolder(folder);
+          setCurrentView('folder-detail');
+        }
+      } else if (type === 'file') {
+        const file = vaultFilesState.find(f => f.id.toString() === id);
+        if (file) {
+          setSelectedFile(file);
+          setCurrentView('file-detail');
+        }
+      }
+    } else {
+      setSelectedFolder(null);
+      setSelectedFile(null);
+      setCurrentView('folders');
+    }
+  }, [type, id, foldersState, vaultFilesState]);
 
   const fetchDocuments = async () => {
     try {
@@ -205,22 +230,18 @@ export default function DocumentVault() {
   });
 
   const openFolder = (folder: VaultFolder) => {
-    setSelectedFolder(folder);
-    setCurrentView('folder-detail');
+    navigate(`/lawyer-dashboard/vault/folder/${folder.id}`);
   };
 
   const openFile = (file: VaultFile) => {
-    setSelectedFile(file);
-    setCurrentView('file-detail');
+    navigate(`/lawyer-dashboard/vault/file/${file.id}`);
   };
 
   const goBack = () => {
-    if (currentView === 'file-detail') {
-      setSelectedFile(null);
-      setCurrentView(selectedFolder ? 'folder-detail' : 'folders');
+    if (currentView === 'file-detail' && selectedFolder) {
+      navigate(`/lawyer-dashboard/vault/folder/${selectedFolder.id}`);
     } else {
-      setSelectedFolder(null);
-      setCurrentView('folders');
+      navigate('/lawyer-dashboard/vault');
     }
   };
 

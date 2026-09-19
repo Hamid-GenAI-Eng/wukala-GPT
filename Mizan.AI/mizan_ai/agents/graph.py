@@ -1,10 +1,11 @@
 from langgraph.graph import StateGraph, END
 from mizan_ai.agents.state import GraphState
+from mizan_ai.agents.nodes.pre_router_inspector import pre_router_inspector_node
 from mizan_ai.agents.nodes.router import route_query
+from mizan_ai.agents.nodes.query_normalizer import query_normalizer_node
 from mizan_ai.agents.nodes.retriever import retrieve_documents
 from mizan_ai.agents.nodes.qna import generate_qna
 from mizan_ai.agents.nodes.summarizer import summarize_documents
-from mizan_ai.agents.nodes.refiner import refine_query
 from mizan_ai.agents.nodes.security import security_check_node
 
 from mizan_ai.agents.nodes.emergency_intake import emergency_intake_node
@@ -23,8 +24,9 @@ def build_graph():
     workflow = StateGraph(GraphState)
     
     workflow.add_node("security_guardrail", security_check_node)
+    workflow.add_node("pre_router_inspector", pre_router_inspector_node)
     workflow.add_node("router", route_query)
-    workflow.add_node("refiner", refine_query)
+    workflow.add_node("query_normalizer", query_normalizer_node)
     workflow.add_node("retriever", retrieve_documents)
     workflow.add_node("qna", generate_qna)
     workflow.add_node("summarizer", summarize_documents)
@@ -34,63 +36,45 @@ def build_graph():
     workflow.add_node("reviewer", review_node)
     workflow.add_node("synthesizer", synthesize_node)
     
-    workflow.set_entry_point("security_guardrail")
-    
-    def route_after_security(state: GraphState):
-        if state.get("security_status") == "blocked":
-            return "blocked"
-        return "safe"
-        
-    workflow.add_conditional_edges(
-        "security_guardrail",
-        route_after_security,
-        {
-            "blocked": END,
-            "safe": "router"
-        }
-    )
+    workflow.set_entry_point("router")
     
     def routing_logic(state: GraphState):
-        intent = state.get("intent", "qna")
-        if intent == "emergency":
+        intent = state.get("intent", "LEGAL_QA")
+        if intent == "UNSAFE":
             return "emergency_intake"
-        elif intent == "retrieve" or intent == "deep_research":
-            return "refiner"
-        elif intent == "summarize":
-            return "summarizer"
-        return "qna"
+        elif intent in ["CASUAL", "IRRELEVANT", "INSUFFICIENT_CONTEXT"]:
+            return "synthesizer" # Bypass RAG
+        else:
+            return "retriever" # Bypass query_normalizer for speed
         
     workflow.add_conditional_edges(
         "router",
         routing_logic,
         {
             "emergency_intake": "emergency_intake",
-            "refiner": "refiner",
-            "summarizer": "summarizer",
-            "qna": "qna"
+            "retriever": "retriever",
+            "synthesizer": "synthesizer"
         }
     )
     
-    workflow.add_edge("refiner", "retriever")
-    
-    # The B2B Multi-Agent RAG Pipeline
-    workflow.add_edge("retriever", "analysis")
-    workflow.add_edge("analysis", "synthesizer")
-    workflow.add_edge("synthesizer", "reviewer")
-    
-    def route_after_review(state: GraphState):
-        if state.get("reviewer_decision") == "fail":
-            return "synthesizer"
-        return "end"
+    def post_retrieval_routing(state: GraphState):
+        intent = state.get("intent", "LEGAL_QA")
+        if intent in ["LEGAL_RESEARCH", "DOCUMENT_ANALYSIS"]:
+            return "analysis"
+        return "synthesizer" # Fast path for normal queries
         
     workflow.add_conditional_edges(
-        "reviewer",
-        route_after_review,
+        "retriever",
+        post_retrieval_routing,
         {
-            "synthesizer": "synthesizer",
-            "end": END
+            "analysis": "analysis",
+            "synthesizer": "synthesizer"
         }
     )
+    
+    workflow.add_edge("analysis", "reviewer")
+    workflow.add_edge("reviewer", "synthesizer")
+    workflow.add_edge("synthesizer", END)
     
     workflow.add_edge("emergency_intake", END)
     workflow.add_edge("summarizer", END)

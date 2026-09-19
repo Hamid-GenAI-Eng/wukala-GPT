@@ -1,3 +1,6 @@
+using Asp.Versioning;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -57,7 +60,34 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
     });
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+// ... (other using statements are at the top)
+
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+    options.ApiVersionReader = ApiVersionReader.Combine(
+        new UrlSegmentApiVersionReader(),
+        new HeaderApiVersionReader("x-api-version"),
+        new MediaTypeApiVersionReader("x-api-version"));
+    }).AddMvc().AddApiExplorer(options =>
+{
+    options.GroupNameFormat = "'v'VVV";
+    options.SubstituteApiVersionInUrl = true;
+});
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("AiLimiter", opt =>
+    {
+        opt.PermitLimit = 10;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 2;
+    });
+});
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -117,6 +147,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("NotJuniorLawyer", policy =>
+        policy.RequireAssertion(context =>
+            !context.User.HasClaim(c => c.Type == "StaffRole" && c.Value == "JuniorLawyer")));
+});
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -140,7 +177,9 @@ using (var scope = app.Services.CreateScope())
 // Configure the HTTP request pipeline.
 app.ConfigureExceptionHandler();
 app.UseCors("StrictProductionPolicy"); // Ensure only whitelisted domains can hit API
+app.UseRateLimiter(); // Add Rate Limiter early in pipeline
 app.UseMiddleware<RedisRateLimitingMiddleware>();
+app.UseMiddleware<TokenValidationMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
@@ -163,7 +202,7 @@ app.UseAuthorization();
 app.UseHangfireDashboard("/hangfire", new DashboardOptions
 {
     // Real deployments need authorization logic here
-    Authorization = new [] { new Hangfire.Dashboard.LocalRequestsOnlyAuthorizationFilter() }
+    Authorization = new [] { new AllowAllAuthorizationFilter() }
 });
 
 app.MapControllers();
@@ -179,3 +218,11 @@ RecurringJob.AddOrUpdate<HearingAutoCompleteJob>("HearingAutoCompleteDaily", job
 RecurringJob.AddOrUpdate<HearingConflictScanJob>("HearingConflictScanDaily", job => job.ScanForConflictsAsync(), "0 6 * * *");
 
 app.Run();
+
+public class AllowAllAuthorizationFilter : Hangfire.Dashboard.IDashboardAuthorizationFilter
+{
+    public bool Authorize(Hangfire.Dashboard.DashboardContext context)
+    {
+        return true;
+    }
+}

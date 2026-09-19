@@ -8,6 +8,7 @@ public interface ILawyerProfileService
 {
     Task<LawyerProfileDto> GetProfileAsync(Guid lawyerUserId);
     Task<LawyerProfileDto> UpdateProfileAsync(Guid lawyerUserId, UpdateLawyerProfileDto dto);
+    Task UpdateSettingsAsync(Guid lawyerUserId, UpdateLawyerSettingsDto dto);
     Task<string> UpdateProfilePhotoAsync(Guid lawyerUserId, IFormFile photo);
     
     // Collections Management

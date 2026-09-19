@@ -240,4 +240,130 @@ public class BillingService : IBillingService
             }).ToList() ?? new List<InvoiceItemDto>()
         };
     }
+
+    public async Task<RetainerDto> CreateRetainerAsync(Guid lawyerId, CreateRetainerDto dto)
+    {
+        var count = await _context.Retainers.CountAsync(r => r.LawyerId == lawyerId);
+        var retainerNumber = $"RET-{DateTime.Now.Year}-{100 + count + 1}";
+
+        var retainer = new Retainer
+        {
+            LawyerId = lawyerId,
+            ClientId = dto.ClientId,
+            RetainerNumber = retainerNumber,
+            TotalAmount = dto.TotalAmount,
+            UsedAmount = 0,
+            StartDate = dto.StartDate,
+            EndDate = dto.EndDate,
+            BillingCycle = dto.BillingCycle,
+            Status = "Active",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        _context.Retainers.Add(retainer);
+        await _context.SaveChangesAsync(default);
+
+        return new RetainerDto
+        {
+            Id = retainer.Id,
+            RetainerNumber = retainer.RetainerNumber,
+            ClientName = "Unknown Client", // will be refreshed by caller
+            TotalAmount = retainer.TotalAmount,
+            UsedAmount = retainer.UsedAmount,
+            StartDate = retainer.StartDate,
+            EndDate = retainer.EndDate,
+            Status = retainer.Status,
+            BillingCycle = retainer.BillingCycle
+        };
+    }
+
+    public async Task<BillingTemplateDto> CreateTemplateAsync(Guid lawyerId, CreateTemplateDto dto)
+    {
+        var template = new BillingTemplate
+        {
+            LawyerId = lawyerId,
+            Name = dto.Name,
+            Category = dto.Category,
+            Description = dto.Description,
+            Items = dto.Items.Select(i => new BillingTemplateItem
+            {
+                Description = i.Description,
+                Rate = i.Rate
+            }).ToList(),
+            UsageCount = 0,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.BillingTemplates.Add(template);
+        await _context.SaveChangesAsync(default);
+
+        return new BillingTemplateDto
+        {
+            Id = template.Id,
+            Name = template.Name,
+            Category = template.Category,
+            Description = template.Description,
+            UsageCount = template.UsageCount,
+            Items = template.Items.Select(i => new InvoiceItemDto
+            {
+                Description = i.Description,
+                Rate = i.Rate,
+                Hours = 1,
+                Amount = i.Rate
+            }).ToList()
+        };
+    }
+
+    public async Task<PaymentDto> RecordPaymentAsync(Guid lawyerId, Guid invoiceId, CreatePaymentDto dto)
+    {
+        var invoice = await _context.Invoices
+            .Include(i => i.Client)
+            .FirstOrDefaultAsync(i => i.Id == invoiceId && i.LawyerId == lawyerId);
+
+        if (invoice == null)
+            throw new Exception("Invoice not found");
+
+        var payment = new Payment
+        {
+            ClientId = invoice.ClientId,
+            InvoiceId = invoice.Id,
+            Amount = dto.Amount,
+            PaymentDate = dto.Date,
+            Method = dto.Method,
+            Reference = dto.Reference,
+            Status = "Completed",
+            CreatedAt = DateTime.UtcNow
+        };
+
+        _context.Payments.Add(payment);
+
+        invoice.PaidAmount += dto.Amount;
+        invoice.PaidDate = dto.Date;
+        invoice.PaymentMethod = dto.Method;
+        invoice.UpdatedAt = DateTime.UtcNow;
+
+        if (invoice.PaidAmount >= invoice.Amount)
+        {
+            invoice.Status = "Paid";
+        }
+        else if (invoice.PaidAmount > 0)
+        {
+            invoice.Status = "Partially Paid";
+        }
+
+        await _context.SaveChangesAsync(default);
+
+        return new PaymentDto
+        {
+            Id = payment.Id,
+            InvoiceNumber = invoice.InvoiceNumber,
+            ClientName = invoice.Client?.FullName ?? "Unknown Client",
+            Amount = payment.Amount,
+            Date = payment.PaymentDate,
+            Method = payment.Method,
+            Reference = payment.Reference,
+            Status = payment.Status
+        };
+    }
 }

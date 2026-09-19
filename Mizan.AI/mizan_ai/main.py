@@ -1,10 +1,42 @@
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["ONNXRUNTIME_INTEROP_NUM_THREADS"] = "1"
+os.environ["ONNXRUNTIME_INTRA_OP_NUM_THREADS"] = "1"
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from mizan_ai.core.config import settings
+from mizan_ai.services.llm_service import llm_service
+from mizan_ai.services.embedding_service import embedding_service
+
+import logging
+logger = logging.getLogger(__name__)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Check Ollama (non-fatal — LLM features are optional)
+    try:
+        llm_service.check_ollama_status()
+    except Exception as e:
+        logger.warning(f"Ollama not available (LLM-based features will be disabled): {e}")
+        
+    # Eagerly load FastEmbed ONNX models so the first user query doesn't hang
+    try:
+        logger.info("Pre-loading FastEmbed ONNX models into memory...")
+        embedding_service._load_models()
+        logger.info("FastEmbed models loaded successfully.")
+    except Exception as e:
+        logger.error(f"Failed to pre-load embedding models: {e}")
+        
+    yield
+    # Shutdown logic if any
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan
 )
 
 # Set up CORS

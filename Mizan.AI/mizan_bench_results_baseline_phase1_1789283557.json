@@ -1,0 +1,52 @@
+{
+  "timestamp": "2026-09-13T12:12:37.123090",
+  "run_name": "baseline_phase1",
+  "overall_metrics": {
+    "Recall@5": 0.3333333333333333,
+    "Recall@10": 0.3333333333333333,
+    "MRR": 0.3333333333333333,
+    "NDCG@10": 0.3333333333333333,
+    "latency_ms": 26023.04259936015
+  },
+  "results": [
+    {
+      "case_id": "q_001_en",
+      "metrics": {
+        "Recall@5": 0.0,
+        "Recall@10": 0.0,
+        "MRR": 0.0,
+        "NDCG@10": 0.0,
+        "latency_ms": 2.0279884338378906
+      },
+      "retrieved": []
+    },
+    {
+      "case_id": "q_002_roman_ur",
+      "metrics": {
+        "Recall@5": 0.0,
+        "Recall@10": 0.0,
+        "MRR": 0.0,
+        "NDCG@10": 0.0,
+        "latency_ms": 37911.62085533142
+      },
+      "retrieved": [
+        "28295451-6286-5991-b0ae-c14ef2c64fee",
+        "549774e7-af80-53a0-b7c9-ac82ba6c1438",
+        "18aa1b9b-e45c-5419-8cc2-94b2edfed380",
+        "8772717b-fcda-5dff-a9cc-956073782678",
+        "3b0cc436-c9a6-570e-b661-29797ae55b76"
+      ]
+    },
+    {
+      "case_id": "q_003_ur",
+      "metrics": {
+        "Recall@5": 1.0,
+        "Recall@10": 1.0,
+        "MRR": 1.0,
+        "NDCG@10": 1.0,
+        "latency_ms": 40155.478954315186
+      },
+      "retrieved": []
+    }
+  ]
+}

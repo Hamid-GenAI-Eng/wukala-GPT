@@ -7,11 +7,14 @@ using System.Threading.Tasks;
 using WukalaGPT.Application.Features.CaseManagement;
 using WukalaGPT.Application.Interfaces;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [Authorize]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 public class CasesController : ControllerBase
 {
     private readonly IMediator _mediator;

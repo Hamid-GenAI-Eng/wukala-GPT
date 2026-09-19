@@ -8,6 +8,8 @@ using WukalaGPT.Application.Interfaces;
 using WukalaGPT.Domain.Entities;
 using WukalaGPT.Domain.Enums;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 public class AddExpenseRequestDto
@@ -20,7 +22,8 @@ public class AddExpenseRequestDto
 
 [Authorize(Roles = "Lawyer,Admin")]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 public class ExpenseController : ControllerBase
 {
     private readonly IApplicationDbContext _context;

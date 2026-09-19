@@ -5,9 +5,9 @@ from langchain_core.messages import SystemMessage, AIMessage
 def summarize_documents(state: GraphState):
     llm = llm_service.get_fast_llm()
     
-    context = state.get("context_documents", [])
-    if not context:
-         return {"messages": [AIMessage(content="There are no documents to summarize.")]}
+    context_docs = state.get("evidence", state.get("context_documents", []))
+    if not context_docs:
+         return {"messages": [AIMessage(content="No documents available to summarize.")]}
          
     system_prompt = """You are Mizan AI's Elite Legal Summarization Agent. 
     

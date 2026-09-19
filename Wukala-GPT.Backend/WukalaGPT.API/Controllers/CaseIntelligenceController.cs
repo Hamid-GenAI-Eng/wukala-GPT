@@ -1,13 +1,17 @@
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WukalaGPT.Application.DTOs.CaseIntelligence;
 using WukalaGPT.Application.Interfaces;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [Authorize(Roles = "Lawyer")]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 public class CaseIntelligenceController : ControllerBase
 {
     private readonly IMizanAiClient _mizanAiClient;

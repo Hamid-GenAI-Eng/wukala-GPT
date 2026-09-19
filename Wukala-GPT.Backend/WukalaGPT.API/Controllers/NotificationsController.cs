@@ -7,11 +7,14 @@ using System.Threading.Tasks;
 using WukalaGPT.Application.Interfaces;
 using WukalaGPT.Application.DTOs.Notifications;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [Authorize]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 public class NotificationsController : ControllerBase
 {
     private readonly INotificationService _notificationService;

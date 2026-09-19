@@ -2,6 +2,11 @@ import logging
 import os
 import site
 
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["ONNXRUNTIME_INTEROP_NUM_THREADS"] = "1"
+os.environ["ONNXRUNTIME_INTRA_OP_NUM_THREADS"] = "1"
+
 # Register NVIDIA pip package DLLs if they exist
 try:
     for pkg in ["cudnn", "cublas"]:
@@ -19,18 +24,27 @@ logger = logging.getLogger(__name__)
 
 class EnterpriseEmbeddingService:
     def __init__(self):
-        logger.info("Initializing Enterprise Embeddings (ONNX/FastEmbed) - PyTorch Free...")
+        self._dense_model = None
+        self._sparse_model = None
+        self._reranker_model = None
+        self.is_loaded = False
+        self._initialized = False
+
+    def _load_models(self):
+        """Lazy-load models on first use so uvicorn starts immediately."""
+        if self._initialized:
+            return
+        self._initialized = True
+        logger.info("Lazy-loading Enterprise Embeddings (ONNX/FastEmbed) - PyTorch Free...")
         try:
-            providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-            
-            # Using BAAI/bge-large-en-v1.5 for dense (1024 dimensions)
-            self.dense_model = TextEmbedding(model_name="BAAI/bge-large-en-v1.5", providers=providers) 
-            # Using Splade for Sparse
-            self.sparse_model = SparseTextEmbedding(model_name="prithivida/Splade_PP_en_v1", providers=providers)
-            # Using Jina Reranker v2 Multilingual for Cross-Encoder Reranking
-            self.reranker_model = TextCrossEncoder(model_name="jinaai/jina-reranker-v2-base-multilingual", providers=providers)
+            providers = ["CPUExecutionProvider"]
+            from mizan_ai.core.config import settings
+
+            self._dense_model = TextEmbedding(model_name=settings.MIZAN_DENSE_MODEL, providers=providers)
+            self._sparse_model = SparseTextEmbedding(model_name=settings.MIZAN_SPARSE_MODEL, providers=providers)
+            self._reranker_model = TextCrossEncoder(model_name=settings.MIZAN_RERANK_MODEL, providers=["CPUExecutionProvider"])
             self.is_loaded = True
-            logger.info("FastEmbed loaded successfully.")
+            logger.info("FastEmbed loaded successfully with configured models.")
         except Exception as e:
             logger.error(f"Failed to load ONNX embeddings: {e}")
             self.is_loaded = False
@@ -39,18 +53,16 @@ class EnterpriseEmbeddingService:
         """
         Returns dense and sparse vectors for the given text using ONNX CPU Runtime.
         """
+        self._load_models()
         if not self.is_loaded:
             return {
                 "dense": [0.0] * 1024,
                 "sparse": {"indices": [1], "values": [0.1]}
             }
-        
-        # Dense
-        dense_vecs = list(self.dense_model.embed([text]))[0]
-        
-        # Sparse
-        sparse_vecs = list(self.sparse_model.embed([text]))[0]
-        
+
+        dense_vecs = list(self._dense_model.embed([text]))[0]
+        sparse_vecs = list(self._sparse_model.embed([text]))[0]
+
         return {
             "dense": dense_vecs.tolist(),
             "sparse": {
@@ -63,15 +75,15 @@ class EnterpriseEmbeddingService:
         """
         Batched embedding generation. Returns a list of vectors.
         """
+        self._load_models()
         if not self.is_loaded or not texts:
             return [{
                 "dense": [0.0] * 1024,
                 "sparse": {"indices": [1], "values": [0.1]}
             } for _ in texts]
 
-        # FastEmbed is highly optimized for lists
-        dense_vecs_generator = self.dense_model.embed(texts)
-        sparse_vecs_generator = self.sparse_model.embed(texts)
+        dense_vecs_generator = self._dense_model.embed(texts)
+        sparse_vecs_generator = self._sparse_model.embed(texts)
 
         results = []
         for dense, sparse in zip(dense_vecs_generator, sparse_vecs_generator):
@@ -83,17 +95,16 @@ class EnterpriseEmbeddingService:
                 }
             })
         return results
-        
+
     def rerank_documents(self, query: str, documents: list[str]) -> list[float]:
         """
         Takes a query and a list of document strings, returns their relevance scores.
         """
+        self._load_models()
         if not self.is_loaded or not documents:
             return [1.0] * len(documents)
-            
-        # FastEmbed reranker returns an iterable of arrays containing the score
-        # e.g. [array([0.9]), array([0.1])]
-        scores = list(self.reranker_model.rerank(query, documents))
+
+        scores = list(self._reranker_model.rerank(query, documents))
         return [float(score) for score in scores]
 
 embedding_service = EnterpriseEmbeddingService()

@@ -15,6 +15,7 @@ public class WukalaDbContext : DbContext, IApplicationDbContext
     public DbSet<LawyerProfile> LawyerProfiles => Set<LawyerProfile>();
     public DbSet<ClientProfile> ClientProfiles => Set<ClientProfile>();
     public DbSet<LegalDocument> LegalDocuments => Set<LegalDocument>();
+    public DbSet<DocumentDraft> DocumentDrafts => Set<DocumentDraft>();
     public DbSet<ChatSession> ChatSessions => Set<ChatSession>();
     public DbSet<Message> Messages => Set<Message>();
     public DbSet<Conversation> Conversations => Set<Conversation>();

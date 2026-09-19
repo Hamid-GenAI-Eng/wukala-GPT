@@ -24,14 +24,28 @@ public class GetClientDetailQueryHandler : IRequestHandler<GetClientDetailQuery,
         var c = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.Id == req.ClientId && c.FirmId == req.FirmId, cancellationToken);
         if (c == null) throw new UnauthorizedAccessException("Client not found or access denied.");
 
-        // Async Parallel processing of stats
-        var interactionsCountTask = _db.ClientInteractions.Where(i => i.ClientId == c.Id).CountAsync(cancellationToken);
-        var lastContactTask = _db.ClientInteractions.Where(i => i.ClientId == c.Id).MaxAsync(i => (DateTimeOffset?)i.InteractionDate, cancellationToken);
-        var allCasesTask = _db.LegalCases.Where(k => k.ClientId == c.Id && !k.IsArchived).ToListAsync(cancellationToken);
+        // Sequential processing to avoid DbContext concurrency issues
+        var interactionsCount = await _db.ClientInteractions.Where(i => i.ClientId == c.Id).CountAsync(cancellationToken);
+        var lastContact = await _db.ClientInteractions.Where(i => i.ClientId == c.Id).MaxAsync(i => (DateTimeOffset?)i.InteractionDate, cancellationToken);
+        var allCases = await _db.LegalCases.Where(k => k.ClientId == c.Id && !k.IsArchived).ToListAsync(cancellationToken);
+        
+        var interactions = await _db.ClientInteractions.Where(i => i.ClientId == c.Id).OrderByDescending(i => i.InteractionDate).Take(50).ToListAsync(cancellationToken);
 
-        await Task.WhenAll(interactionsCountTask, lastContactTask, allCasesTask);
-
-        var allCases = allCasesTask.Result;
+        var portalDocs = await _db.ClientPortalDocumentAccesses
+            .Where(a => a.ClientId == c.Id && a.RevokedAt == null)
+            .Join(_db.LegalDocuments, 
+                a => a.DocumentId, 
+                d => d.Id, 
+                (a, d) => new {
+                    id = d.Id,
+                    fullName = d.DefaultTitle != "" ? d.DefaultTitle : d.FileName,
+                    type = d.Classification.ToString(),
+                    sharedDate = a.SharedAt.ToString("MMM dd, yyyy"),
+                    size = (d.SizeInBytes / 1024) + " KB",
+                    url = d.FileUrl
+                })
+            .Cast<object>()
+            .ToListAsync(cancellationToken);
 
         return new ClientDetailDto
         {
@@ -44,11 +58,28 @@ public class GetClientDetailQueryHandler : IRequestHandler<GetClientDetailQuery,
             {
                 TotalCasesCount = allCases.Count,
                 ActiveCasesCount = allCases.Count(k => k.Status != WukalaGPT.Domain.Enums.CaseStatus.Closed),
-                TotalInteractions = interactionsCountTask.Result,
-                LastContactDate = lastContactTask.Result,
+                TotalInteractions = interactionsCount,
+                LastContactDate = lastContact,
                 TotalBilled = 0, // Pending Invoice feature
                 OutstandingBalance = 0
-            }
+            },
+            Cases = allCases.Select(k => new {
+                id = k.Id,
+                title = k.Title,
+                caseNumber = k.CaseNumber,
+                court = k.CourtName,
+                status = k.Status.ToString(),
+                nextHearing = k.NextDate
+            }).Cast<object>().ToList(),
+            Interactions = interactions.Select(i => new {
+                id = i.Id,
+                type = i.Type,
+                summary = i.Summary,
+                date = i.InteractionDate.ToString("MMM dd, yyyy"),
+                time = i.InteractionDate.ToString("hh:mm tt"),
+                duration = i.DurationMins.HasValue ? $"{i.DurationMins} min" : null
+            }).Cast<object>().ToList(),
+            Documents = portalDocs
         };
     }
 }

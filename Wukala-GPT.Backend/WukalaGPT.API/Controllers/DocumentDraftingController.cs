@@ -3,9 +3,12 @@ using Microsoft.AspNetCore.Mvc;
 using WukalaGPT.Application.DTOs.Drafting;
 using WukalaGPT.Application.Interfaces;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
-[Route("api/document-drafting")]
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/document-drafting")]
 [ApiController]
 [Authorize] // Ensure WukalaGPT users are authenticated
 public class DocumentDraftingController : ControllerBase
@@ -31,22 +34,22 @@ public class DocumentDraftingController : ControllerBase
         }
     }
 
-    [HttpPost("generate")]
-    public async Task<ActionResult<DraftGenerateResponse>> GenerateDraft([FromBody] DraftGenerateRequest request)
+    [HttpGet("template-content")]
+    public async Task<ActionResult<TemplateContentResponse>> GetTemplateContent([FromQuery] string path)
     {
-        if (string.IsNullOrWhiteSpace(request.TemplatePath) || string.IsNullOrWhiteSpace(request.CaseFacts))
+        if (string.IsNullOrWhiteSpace(path))
         {
-            return BadRequest(new { message = "Template path and case facts are required." });
+            return BadRequest(new { message = "Template path is required." });
         }
 
         try
         {
-            var response = await _mizanAiClient.GenerateDraftAsync(request);
+            var response = await _mizanAiClient.GetTemplateContentAsync(path);
             return Ok(response);
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { message = "Error generating document draft", details = ex.Message });
+            return StatusCode(500, new { message = "Error fetching template content", details = ex.Message });
         }
     }
 
@@ -69,24 +72,6 @@ public class DocumentDraftingController : ControllerBase
             return StatusCode(500, new { message = "Error exporting document", details = ex.Message });
         }
     }
-    [HttpPost("extract-fields")]
-    public async Task<ActionResult<ExtractFieldsResponse>> ExtractFields([FromBody] ExtractFieldsRequest request)
-    {
-        if (string.IsNullOrWhiteSpace(request.TemplatePath))
-        {
-            return BadRequest(new { message = "Template path is required." });
-        }
-
-        try
-        {
-            var response = await _mizanAiClient.ExtractFieldsAsync(request);
-            return Ok(response);
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { message = "Error extracting fields", details = ex.Message });
-        }
-    }
 
     [HttpGet("template-file")]
     [AllowAnonymous]
@@ -100,7 +85,7 @@ public class DocumentDraftingController : ControllerBase
         try
         {
             var stream = await _mizanAiClient.GetTemplateFileAsync(path);
-            return File(stream, "application/pdf");
+            return File(stream, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
         }
         catch (Exception ex)
         {

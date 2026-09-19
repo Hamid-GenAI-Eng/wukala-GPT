@@ -1,0 +1,46 @@
+{
+  "timestamp": "2026-09-13T11:19:58.080408",
+  "run_name": "baseline_phase1",
+  "overall_metrics": {
+    "Recall@5": 0.3333333333333333,
+    "Recall@10": 0.3333333333333333,
+    "MRR": 0.3333333333333333,
+    "NDCG@10": 0.3333333333333333,
+    "latency_ms": 233.5949738820394
+  },
+  "results": [
+    {
+      "case_id": "q_001_en",
+      "metrics": {
+        "Recall@5": 0.0,
+        "Recall@10": 0.0,
+        "MRR": 0.0,
+        "NDCG@10": 0.0,
+        "latency_ms": 375.26416778564453
+      },
+      "retrieved": []
+    },
+    {
+      "case_id": "q_002_roman_ur",
+      "metrics": {
+        "Recall@5": 0.0,
+        "Recall@10": 0.0,
+        "MRR": 0.0,
+        "NDCG@10": 0.0,
+        "latency_ms": 163.0561351776123
+      },
+      "retrieved": []
+    },
+    {
+      "case_id": "q_003_ur",
+      "metrics": {
+        "Recall@5": 1.0,
+        "Recall@10": 1.0,
+        "MRR": 1.0,
+        "NDCG@10": 1.0,
+        "latency_ms": 162.46461868286133
+      },
+      "retrieved": []
+    }
+  ]
+}

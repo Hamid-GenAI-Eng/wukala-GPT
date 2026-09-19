@@ -6,11 +6,14 @@ using System.Threading.Tasks;
 using WukalaGPT.Application.Interfaces;
 using WukalaGPT.Application.DTOs.Billing;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
-[Authorize(Roles = "Lawyer")]
+[Authorize(Roles = "Lawyer", Policy = "NotJuniorLawyer")]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 public class BillingController : ControllerBase
 {
     private readonly IBillingService _billingService;
@@ -75,6 +78,37 @@ public class BillingController : ControllerBase
         var lawyerId = GetUserId();
         var templates = await _billingService.GetTemplatesAsync(lawyerId);
         return Ok(templates);
+    }
+
+    [HttpPost("invoices/{id}/pay")]
+    public async Task<IActionResult> RecordPayment(Guid id, CreatePaymentDto dto)
+    {
+        try
+        {
+            var lawyerId = GetUserId();
+            var payment = await _billingService.RecordPaymentAsync(lawyerId, id, dto);
+            return Ok(payment);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("retainers")]
+    public async Task<IActionResult> CreateRetainer(CreateRetainerDto dto)
+    {
+        var lawyerId = GetUserId();
+        var retainer = await _billingService.CreateRetainerAsync(lawyerId, dto);
+        return Ok(retainer);
+    }
+
+    [HttpPost("templates")]
+    public async Task<IActionResult> CreateTemplate(CreateTemplateDto dto)
+    {
+        var lawyerId = GetUserId();
+        var template = await _billingService.CreateTemplateAsync(lawyerId, dto);
+        return Ok(template);
     }
 
     private Guid GetUserId()

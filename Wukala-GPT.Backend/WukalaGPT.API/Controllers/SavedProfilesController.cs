@@ -3,10 +3,13 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using WukalaGPT.Application.Interfaces;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 [Authorize(Roles = "Client")]
 public class SavedProfilesController : ControllerBase
 {

@@ -11,13 +11,31 @@ class Settings(BaseSettings):
     QDRANT_API_KEY: Optional[str] = None
     
     # LLM Settings
-    GROQ_API_KEY: Optional[str] = None
+    LLM_PROVIDER: str = "ollama"
+    OLLAMA_BASE_URL: str = "http://host.docker.internal:11434"
+    MIZAN_FAST_MODEL: str = "qwen3:8b"
+    MIZAN_REASONING_MODEL: str = "qwen3:14b"
+    MIZAN_REVIEW_MODEL: str = "qwen3:14b"
     
-    # Security
-    SECRET_KEY: str = "a_very_secret_key_for_mizan_ai_REPLACE_ME_IN_PROD"
+    GROQ_API_KEY: Optional[str] = None
+    SECOND_GROQ: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    
+    # Security (No default for SECRET_KEY to fail loudly in prod)
+    SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     ALLOWED_ORIGINS: list[str] = ["*"] # Override in production via ALLOWED_ORIGINS='["https://mydomain.com"]'
+    
+    # Models
+    MIZAN_DENSE_MODEL: str = "BAAI/bge-large-en-v1.5"
+    MIZAN_DENSE_DIMENSION: int = 1024
+    MIZAN_SPARSE_MODEL: str = "prithivida/Splade_PP_en_v1"
+    MIZAN_RERANK_MODEL: str = "jinaai/jina-reranker-v2-base-multilingual"
+    
+    # Retrieval configuration
+    TOP_K_INITIAL: int = 15
+    TOP_K_RERANK: int = 5
     
     # Data source
     CORPUS_PATH: str = "Legal corpus"

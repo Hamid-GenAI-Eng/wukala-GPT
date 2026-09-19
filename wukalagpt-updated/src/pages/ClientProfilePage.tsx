@@ -76,9 +76,9 @@ export default function ClientProfilePage() {
         const data = await api.getProfile();
         setProfileData({
           id: data.id,
-          name: data.name || '',
+          name: data.fullName || data.name || '',
           email: data.email || '',
-          phone: data.phoneNo || '',
+          phone: data.phoneNumber || data.phoneNo || '',
           city: data.city || '',
           preferredArea: 'General Practice',
           status: 'Active',
@@ -124,12 +124,19 @@ export default function ClientProfilePage() {
 
     setIsSaving(true);
     try {
-      await api.updateClientProfile(profileData.id, {
-        fullName: profileData.name,
-        phoneNumber: profileData.phone,
-        city: profileData.city,
-        preferredLegalArea: profileData.preferredArea
-      });
+      if (isOwnProfile) {
+        await api.updateProfile({
+          fullName: profileData.name,
+          phoneNumber: profileData.phone,
+          city: profileData.city
+        });
+      } else {
+        await api.updateClientProfile(profileData.id, {
+          fullName: profileData.name,
+          phoneNumber: profileData.phone,
+          city: profileData.city
+        });
+      }
       toast.success("Profile updated successfully!");
     } catch (error: any) {
       toast.error(error.message || "Failed to update profile");
@@ -209,10 +216,7 @@ export default function ClientProfilePage() {
 
                 <div className="flex-1 text-center md:text-left">
                   <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
-                    <h1 className="text-3xl font-extrabold tracking-tight">{profileData.name}</h1>
-                    <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
-                      Client Portal
-                    </Badge>
+                    <h1 className="text-3xl font-extrabold tracking-tight">{profileData.name || profileData.email}</h1>
                   </div>
                   <p className="text-muted-foreground font-medium mb-3">{profileData.email}</p>
                   
@@ -245,24 +249,15 @@ export default function ClientProfilePage() {
                   </p>
                 </div>
               </div>
-              
-              <div className="p-3 bg-primary/5 rounded-xl border border-primary/10 flex items-center gap-3">
-                <Scale className="h-5 w-5 text-primary flex-shrink-0" />
-                <div>
-                  <h4 className="text-xs font-extrabold text-primary">Preferred Legal Area</h4>
-                  <p className="text-xs font-semibold text-muted-foreground mt-0.5">{profileData.preferredArea}</p>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </div>
 
         {/* Detailed Menu Tabs */}
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="bg-muted/50 p-1 w-full md:w-auto grid grid-cols-3 md:inline-flex border border-border/50">
+          <TabsList className="bg-muted/50 p-1 w-full md:w-auto grid grid-cols-2 md:inline-flex border border-border/50">
             <TabsTrigger value="profile" className="px-6 text-xs font-bold">Profile Info</TabsTrigger>
-            {isOwnProfile && <TabsTrigger value="saved" className="px-6 text-xs font-bold">Saved Partners</TabsTrigger>}
-            {isOwnProfile && <TabsTrigger value="security" className="px-6 text-xs font-bold">Security</TabsTrigger>}
+            {isOwnProfile && <TabsTrigger value="saved" className="px-6 text-xs font-bold">Saved Lawyers</TabsTrigger>}
           </TabsList>
 
           {/* Profile Form Tab */}
@@ -320,25 +315,7 @@ export default function ClientProfilePage() {
                       />
                     </div>
 
-                    <div className="space-y-2 md:col-span-2">
-                      <label className="text-xs font-bold text-muted-foreground uppercase">Preferred Practice Area</label>
-                      <select 
-                        disabled={!isOwnProfile}
-                        value={profileData.preferredArea} 
-                        onChange={(e) => setProfileData({...profileData, preferredArea: e.target.value})}
-                        className="w-full h-11 bg-background border border-input rounded-xl px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                      >
-                        <option value="General Practice">General Practice</option>
-                        <option value="Criminal Law">Criminal Law</option>
-                        <option value="Corporate & Business">Corporate & Business</option>
-                        <option value="Family & Divorce">Family & Divorce</option>
-                        <option value="Taxation">Taxation</option>
-                        <option value="Intellectual Property">Intellectual Property</option>
-                        <option value="Real Estate">Real Estate</option>
-                      </select>
                     </div>
-
-                  </div>
 
                   {isOwnProfile && (
                     <Button 
@@ -429,68 +406,6 @@ export default function ClientProfilePage() {
               </CardContent>
             </Card>
           </TabsContent>
-
-          {/* Security Tab */}
-          <TabsContent value="security">
-            <Card className="border border-border bg-card/60 backdrop-blur-md">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lock className="h-5 w-5 text-primary" />
-                  Security Settings
-                </CardTitle>
-                <CardDescription>Maintain your portal credentials securely.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handlePasswordChange} className="max-w-md space-y-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-muted-foreground uppercase">Current Password</label>
-                    <Input 
-                      type="password"
-                      value={passwordForm.oldPassword}
-                      onChange={e => setPasswordForm({...passwordForm, oldPassword: e.target.value})}
-                      className="h-11 rounded-xl"
-                      placeholder="••••••••"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-muted-foreground uppercase">New Password</label>
-                    <Input 
-                      type="password"
-                      value={passwordForm.newPassword}
-                      onChange={e => setPasswordForm({...passwordForm, newPassword: e.target.value})}
-                      className="h-11 rounded-xl"
-                      placeholder="••••••••"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-muted-foreground uppercase">Confirm New Password</label>
-                    <Input 
-                      type="password"
-                      value={passwordForm.confirmPassword}
-                      onChange={e => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
-                      className="h-11 rounded-xl"
-                      placeholder="••••••••"
-                      required
-                    />
-                  </div>
-
-                  <Button 
-                    disabled={isSaving}
-                    type="submit" 
-                    className="bg-primary hover:bg-primary/95 text-white font-bold h-11 px-8 rounded-xl"
-                  >
-                    {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Update Password
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
         </Tabs>
 
       </div>

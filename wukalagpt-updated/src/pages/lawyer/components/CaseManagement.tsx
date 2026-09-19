@@ -68,6 +68,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 import { AddHearingDialog } from './AddHearingDialog';
@@ -193,6 +194,8 @@ const isTransitionAllowed = (from: CaseStatus, to: CaseStatus): boolean => {
 };
 
 export default function CaseManagement() {
+  const { caseId } = useParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [resilientDetails, setResilientDetails] = useState<Record<string, {
@@ -409,6 +412,7 @@ export default function CaseManagement() {
         name: d.name || d.fileName || 'Untitled Document',
         type: d.classification || d.mimeType || 'PDF',
         size: d.sizeFormatted || d.size || 'Unknown size',
+        url: d.url || d.fileUrl || d.path,
         uploadedBy: 'Lawyer',
         uploadedAt: d.uploadedAt ? new Date(d.uploadedAt).toLocaleDateString() : (d.date || 'Just now'),
         confidential: false
@@ -470,6 +474,14 @@ export default function CaseManagement() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (caseId) {
+      loadCaseDetails(caseId);
+    } else {
+      setSelectedCase(null);
+    }
+  }, [caseId, caseList.length]);
 
   useEffect(() => {
     loadCasesList();
@@ -611,7 +623,7 @@ export default function CaseManagement() {
         try {
           setArchivingCase(true);
           await api.archiveCase(selectedCase.id);
-          setSelectedCase(null);
+          navigate('/lawyer-dashboard/cases');
           toast({
             title: "Case Archived",
             description: "Case successfully archived."
@@ -780,8 +792,43 @@ export default function CaseManagement() {
     });
   };
 
-  const handleDownloadDoc = (url: string, name: string) => {
+  const handleViewDoc = (url: string, name: string) => {
     setDocViewer({ isOpen: true, url, name });
+  };
+
+  const handleDownloadDoc = (url: string, name: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name || 'document';
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDeleteDoc = (docId: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Document",
+      description: "Are you sure you want to delete this document? This action cannot be undone.",
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await api.deleteDocument(docId);
+          toast({ title: "Document Deleted", description: "The document has been removed." });
+          if (selectedCase) {
+            await loadCaseDetails(selectedCase.id);
+          }
+        } catch (err: any) {
+          console.error("Failed to delete document", err);
+          toast({
+            variant: "destructive",
+            title: "Deletion Failed",
+            description: err?.message || "Could not delete document."
+          });
+        }
+      }
+    });
   };
 
   const handleLinkCaseSubmit = async () => {
@@ -913,7 +960,7 @@ export default function CaseManagement() {
             variant="ghost"
             size="sm"
             className="w-fit text-xs font-sans gap-1.5 text-muted-foreground hover:text-foreground -ml-2"
-            onClick={() => setSelectedCase(null)}
+            onClick={() => navigate('/lawyer-dashboard/cases')}
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Back to Cases
@@ -1162,16 +1209,21 @@ export default function CaseManagement() {
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
                             <Badge variant="secondary" className="text-[9px] font-sans">{doc.type}</Badge>
-                            {doc.url && (
-                              <div className="flex gap-1">
-                                <a href={doc.url} target="_blank" rel="noopener noreferrer">
-                                  <Button variant="ghost" size="icon" className="h-7 w-7"><Eye className="h-3.5 w-3.5" /></Button>
-                                </a>
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadDoc(doc.url, doc.name)}>
-                                  <Download className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            )}
+                            <div className="flex gap-1 ml-2">
+                              {doc.url && (
+                                <>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleViewDoc(doc.url, doc.name)} title="View Document">
+                                    <Eye className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDownloadDoc(doc.url, doc.name)} title="Download Document">
+                                    <Download className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
+                              )}
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleDeleteDoc(doc.id)} title="Delete Document">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </CardContent>
@@ -1394,7 +1446,7 @@ export default function CaseManagement() {
             <Card
               key={c.id}
               className="border-border/50 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer group"
-              onClick={() => { loadCaseDetails(c.id); setDetailTab('timeline'); }}
+              onClick={() => { navigate('/lawyer-dashboard/cases/' + c.id); setDetailTab('timeline'); }}
             >
               <CardContent className="p-4">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -1413,7 +1465,6 @@ export default function CaseManagement() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-semibold font-sans text-foreground">{c.title}</p>
-                        <span className="text-[10px] text-muted-foreground font-mono">{c.id}</span>
                         {c.linkedCases.length > 0 && (
                           <span className="flex items-center gap-0.5 text-[9px] text-primary font-sans">
                             <Link2 className="h-3 w-3" /> {c.linkedCases.length} linked

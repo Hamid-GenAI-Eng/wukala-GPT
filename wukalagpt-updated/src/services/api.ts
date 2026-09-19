@@ -6,7 +6,7 @@
  */
 
 // Base API URL - Update this with your actual Azure backend URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5285/api/v1';
 
 // Request timeout in milliseconds (increased for large file uploads and Azure cold-starts)
 const REQUEST_TIMEOUT = 300000;
@@ -266,6 +266,16 @@ export const api = {
     return userData;
   },
 
+  /**
+   * Update current user profile
+   */
+  updateProfile: async (data: { fullName: string, phoneNumber?: string, city?: string }) => {
+    return request<{ message: string }>('/Auth/me', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
   // ==================== LAWYER PROFILE ENDPOINTS ====================
 
   /**
@@ -281,8 +291,15 @@ export const api = {
    * Update current lawyer profile
    */
   updateLawyerMe: async (data: any) => {
-    return request<any>('/Lawyers/me', {
+    return request<LawyerProfileResponse>('/Lawyers/me', {
       method: 'PUT',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  patchLawyerSettings: async (data: { isProfileVisible?: boolean; isAvailableForNewCases?: boolean; receiveEmailNotifications?: boolean }) => {
+    return request<{ message: string }>('/Lawyers/me/settings', {
+      method: 'PATCH',
       body: JSON.stringify(data),
     }, true);
   },
@@ -596,6 +613,11 @@ export const api = {
       rating: res.rating,
       reviewCount: res.reviewCount || 0,
       hourlyRate: res.consultationFee || res.hourlyRate || 0,
+      phoneNumber: res.phoneNumber || '',
+      chamberAddress: res.chamberAddress || '',
+      casesWon: res.casesWon || 0,
+      activeCases: res.activeCases || 0,
+      specialization: res.specialization || '',
       specialities: Array.isArray(res.specialities)
         ? res.specialities.map((s: any) => ({ id: s.id || s.name || s, name: s.name || s }))
         : [],
@@ -633,9 +655,10 @@ export const api = {
    * Get all saved lawyer profiles for the current user
    */
   getSavedProfiles: async () => {
-    return request<PublicLawyerProfile[]>('/SavedProfiles', {
+    const response = await request<{ items: PublicLawyerProfile[], totalCount: number }>('/SavedProfiles', {
       method: 'GET',
     }, true);
+    return response.items || [];
   },
 
   /**
@@ -823,6 +846,36 @@ export const api = {
     }, true);
   },
 
+  /**
+   * Record a payment for an invoice
+   */
+  recordPayment: async (invoiceId: string, data: any) => {
+    return request<any>(`/Billing/invoices/${invoiceId}/pay`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  /**
+   * Create a new retainer
+   */
+  createRetainer: async (data: any) => {
+    return request<any>('/Billing/retainers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
+  /**
+   * Create a new billing template
+   */
+  createTemplate: async (data: any) => {
+    return request<any>('/Billing/templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  },
+
   // ==================== EXPENSE ENDPOINTS ====================
 
   /**
@@ -861,7 +914,7 @@ export const api = {
   createAiChatSession: async (title: string) => {
     return request<AiChatSession>('/AiChat/sessions', {
       method: 'POST',
-      body: JSON.stringify(title),
+      body: JSON.stringify({ title }),
     }, true);
   },
 
@@ -925,7 +978,7 @@ export const api = {
     const response = await fetch(`${API_BASE_URL}/AiChat/tts`, {
       method: 'POST',
       headers,
-      body: JSON.stringify(text)
+      body: JSON.stringify({ text })
     });
 
     if (!response.ok) {
@@ -1344,6 +1397,20 @@ export const api = {
       method: 'DELETE',
     }, true);
   },
+
+  downloadLegalDocument: async (id: string): Promise<Blob> => {
+    const token = getAuthToken();
+    const url = `${API_BASE_URL}/Documents/${id}/download`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : undefined
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to download document: ${response.statusText}`);
+    }
+    return await response.blob();
+  },
 };
 
 
@@ -1412,9 +1479,11 @@ export interface SpecialityResponse {
 
 export interface User {
   id: string;
-  name: string;
+  name?: string;
+  fullName?: string;
   email: string;
   role: 'client' | 'lawyer' | 'admin';
+  phoneNumber?: string;
   phoneNo?: string;
   city?: string;
   profileImage?: string;
@@ -1457,10 +1526,15 @@ export interface PublicLawyerProfile {
   university: string;
   bio?: string;
   experienceYears?: number;
-  rating?: number;
-  reviewCount?: number;
-  hourlyRate?: number;
-  specialities: SpecialityResponse[];
+  rating: number;
+  reviewCount: number;
+  hourlyRate: number;
+  phoneNumber?: string;
+  chamberAddress?: string;
+  casesWon?: number;
+  activeCases?: number;
+  specialization?: string;
+  specialities: { id: string; name: string }[];
   educations?: EducationResponse[];
   experiences?: ExperienceResponse[];
   isVerified: boolean;

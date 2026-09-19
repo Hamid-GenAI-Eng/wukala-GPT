@@ -210,6 +210,38 @@ public class AuthService : IAuthService
         await _context.SaveChangesAsync(default);
     }
 
+    public async Task AcceptInviteAsync(AcceptInviteDto dto)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+        if (user == null || user.PasswordResetToken != dto.Token || user.ResetTokenExpiry < DateTime.UtcNow)
+            throw new Exception("Invalid or expired invitation link.");
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+        user.PasswordResetToken = null;
+        user.ResetTokenExpiry = null;
+        user.IsActive = true;
+        user.IsEmailVerified = true;
+
+        if (user.Role == UserRole.Lawyer)
+        {
+            var lawyerProfile = await _context.LawyerProfiles.FirstOrDefaultAsync(lp => lp.UserId == user.Id);
+            if (lawyerProfile == null)
+            {
+                lawyerProfile = new LawyerProfile
+                {
+                    UserId = user.Id,
+                    VerificationStatus = VerificationStatus.Pending,
+                    DegreeTitle = "N/A",
+                    University = "N/A",
+                    ChamberAddress = "N/A"
+                };
+                _context.LawyerProfiles.Add(lawyerProfile);
+            }
+        }
+
+        await _context.SaveChangesAsync(default);
+    }
+
     public async Task ChangePasswordAsync(Guid userId, ChangePasswordDto dto)
     {
         var user = await _context.Users.FindAsync(userId);
@@ -225,9 +257,17 @@ public class AuthService : IAuthService
 
     public async Task<UserProfileDto> GetMeAsync(Guid userId)
     {
-        var user = await _context.Users.FindAsync(userId);
+        var user = await _context.Users
+            .Include(u => u.ClientProfile)
+            .Include(u => u.LawyerProfile)
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
         if (user == null)
             throw new Exception("User not found.");
+
+        string? profileImage = null;
+        if (user.Role == Domain.Enums.UserRole.Lawyer && user.LawyerProfile != null)
+            profileImage = user.LawyerProfile.ProfilePhotoUrl;
 
         return new UserProfileDto
         {
@@ -235,8 +275,26 @@ public class AuthService : IAuthService
             FullName = $"{user.FirstName} {user.LastName}".Trim(),
             Email = user.Email,
             Role = user.Role.ToString(),
-            IsEmailVerified = user.IsEmailVerified
+            IsEmailVerified = user.IsEmailVerified,
+            PhoneNumber = user.PhoneNumber,
+            City = user.City,
+            ProfileImage = profileImage
         };
+    }
+
+    public async Task UpdateMeAsync(Guid userId, UpdateProfileDto dto)
+    {
+        var user = await _context.Users.FindAsync(userId);
+        if (user == null)
+            throw new Exception("User not found.");
+
+        var nameParts = dto.FullName.Trim().Split(' ', 2);
+        user.FirstName = nameParts[0];
+        user.LastName = nameParts.Length > 1 ? nameParts[1] : string.Empty;
+        user.PhoneNumber = dto.PhoneNumber ?? string.Empty;
+        user.City = dto.City ?? string.Empty;
+
+        await _context.SaveChangesAsync(default);
     }
 
     private string GenerateOtp()

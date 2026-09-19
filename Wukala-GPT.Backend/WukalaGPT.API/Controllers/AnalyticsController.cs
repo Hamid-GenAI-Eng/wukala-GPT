@@ -6,11 +6,14 @@ using System.Threading.Tasks;
 using WukalaGPT.Application.DTOs.Analytics;
 using WukalaGPT.Application.Interfaces;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [Authorize(Roles = "Lawyer,Admin")]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 public class AnalyticsController : ControllerBase
 {
     private readonly IAnalyticsService _analyticsService;

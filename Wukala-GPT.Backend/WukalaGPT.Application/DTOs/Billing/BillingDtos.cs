@@ -65,6 +65,20 @@ public class PaymentDto
     public string Status { get; set; } = string.Empty;
 }
 
+public class CreatePaymentDto
+{
+    [Required]
+    public decimal Amount { get; set; }
+    
+    [Required]
+    public string Method { get; set; } = string.Empty;
+    
+    public string Reference { get; set; } = string.Empty;
+    
+    [Required]
+    public DateTime Date { get; set; }
+}
+
 public class RetainerDto
 {
     public Guid Id { get; set; }
@@ -80,6 +94,24 @@ public class RetainerDto
     public string BillingCycle { get; set; } = string.Empty;
 }
 
+public class CreateRetainerDto
+{
+    [Required]
+    public Guid ClientId { get; set; }
+    
+    [Required]
+    public decimal TotalAmount { get; set; }
+    
+    [Required]
+    public DateTime StartDate { get; set; }
+    
+    [Required]
+    public DateTime EndDate { get; set; }
+    
+    [Required]
+    public string BillingCycle { get; set; } = string.Empty; // Monthly, Quarterly, Annual
+}
+
 public class BillingTemplateDto
 {
     public Guid Id { get; set; }
@@ -89,6 +121,21 @@ public class BillingTemplateDto
     public List<InvoiceItemDto> Items { get; set; } = new();
     public int UsageCount { get; set; }
     public DateTime? LastUsed { get; set; }
+}
+
+public class CreateTemplateDto
+{
+    [Required]
+    public string Name { get; set; } = string.Empty;
+    
+    [Required]
+    public string Category { get; set; } = string.Empty;
+    
+    public string Description { get; set; } = string.Empty;
+    
+    [Required]
+    [MinLength(1)]
+    public List<InvoiceItemDto> Items { get; set; } = new();
 }
 
 public class BillingSummaryDto

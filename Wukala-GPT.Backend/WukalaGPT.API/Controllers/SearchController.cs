@@ -3,10 +3,13 @@ using Microsoft.AspNetCore.Mvc;
 using WukalaGPT.Application.DTOs.Search;
 using WukalaGPT.Application.Interfaces;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 [AllowAnonymous]
 public class SearchController : ControllerBase
 {

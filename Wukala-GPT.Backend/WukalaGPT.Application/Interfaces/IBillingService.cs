@@ -13,5 +13,10 @@ public interface IBillingService
     Task<InvoiceDto> CreateInvoiceAsync(Guid lawyerId, CreateInvoiceDto dto);
     Task<List<PaymentDto>> GetRecentPaymentsAsync(Guid lawyerId);
     Task<List<RetainerDto>> GetRetainersAsync(Guid lawyerId);
+    Task<RetainerDto> CreateRetainerAsync(Guid lawyerId, CreateRetainerDto dto);
+    
     Task<List<BillingTemplateDto>> GetTemplatesAsync(Guid lawyerId);
+    Task<BillingTemplateDto> CreateTemplateAsync(Guid lawyerId, CreateTemplateDto dto);
+    
+    Task<PaymentDto> RecordPaymentAsync(Guid lawyerId, Guid invoiceId, CreatePaymentDto dto);
 }

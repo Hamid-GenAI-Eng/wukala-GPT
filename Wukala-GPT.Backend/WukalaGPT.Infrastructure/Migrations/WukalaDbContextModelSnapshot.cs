@@ -883,6 +883,36 @@ namespace WukalaGPT.Infrastructure.Migrations
                     b.ToTable("Conversations");
                 });
 
+            modelBuilder.Entity("WukalaGPT.Domain.Entities.DocumentDraft", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("HtmlContent")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("LastModifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TemplateName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("DocumentDrafts");
+                });
+
             modelBuilder.Entity("WukalaGPT.Domain.Entities.Education", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1973,6 +2003,17 @@ namespace WukalaGPT.Infrastructure.Migrations
                     b.Navigation("Participant1");
 
                     b.Navigation("Participant2");
+                });
+
+            modelBuilder.Entity("WukalaGPT.Domain.Entities.DocumentDraft", b =>
+                {
+                    b.HasOne("WukalaGPT.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("WukalaGPT.Domain.Entities.Education", b =>

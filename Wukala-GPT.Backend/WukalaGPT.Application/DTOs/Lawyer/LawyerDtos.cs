@@ -60,6 +60,7 @@ public class UpdateLawyerProfileDto
     public string LastName { get; set; } = string.Empty;
     public string PhoneNumber { get; set; } = string.Empty;
     public string City { get; set; } = string.Empty;
+    public string Specialization { get; set; } = string.Empty;
 
     public int YearsOfExperience { get; set; }
     public string Bio { get; set; } = string.Empty;
@@ -69,6 +70,13 @@ public class UpdateLawyerProfileDto
     public bool IsProfileVisible { get; set; } = true;
     public bool IsAvailableForNewCases { get; set; } = true;
     public bool ReceiveEmailNotifications { get; set; } = true;
+}
+
+public class UpdateLawyerSettingsDto
+{
+    public bool? IsProfileVisible { get; set; }
+    public bool? IsAvailableForNewCases { get; set; }
+    public bool? ReceiveEmailNotifications { get; set; }
 }
 
 public class UpdateLawyerBadgesDto

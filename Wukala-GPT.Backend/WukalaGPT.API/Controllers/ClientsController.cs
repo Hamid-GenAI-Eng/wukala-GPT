@@ -8,11 +8,14 @@ using Hangfire;
 
 using WukalaGPT.Application.Interfaces;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [Authorize]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 public class ClientsController : ControllerBase
 {
     private readonly IMediator _mediator;

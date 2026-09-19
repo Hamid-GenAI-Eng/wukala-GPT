@@ -193,12 +193,21 @@ public class MizanAiChatService : IMizanAiChatService
             sessionId = session.Id;
         }
 
+        string finalContent = string.IsNullOrWhiteSpace(request.Message) && request.Files.Count > 0 ? $"[Uploaded {request.Files.Count} files]" : request.Message;
+
+        var audioFile = request.Files.FirstOrDefault(f => f.ContentType.StartsWith("audio/"));
+        if (audioFile != null)
+        {
+            var base64Audio = Convert.ToBase64String(audioFile.ContentBytes);
+            finalContent += $"\n[audio_base64:data:{audioFile.ContentType};base64,{base64Audio}]";
+        }
+
         // Save User Query
         var userMessage = new AiChatMessage
         {
             SessionId = sessionId,
             Role = AiMessageRole.User,
-            Content = string.IsNullOrWhiteSpace(request.Message) && request.Files.Count > 0 ? $"[Uploaded {request.Files.Count} files]" : request.Message,
+            Content = finalContent,
             IsDeepResearch = request.IsDeepResearch,
             CreatedAt = DateTime.UtcNow
         };

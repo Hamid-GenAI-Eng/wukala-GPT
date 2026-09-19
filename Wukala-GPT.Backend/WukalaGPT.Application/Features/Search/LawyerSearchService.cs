@@ -223,6 +223,8 @@ public class LawyerSearchService : ILawyerSearchService
             FirstName = lawyer.User.FirstName,
             LastName = lawyer.User.LastName,
             City = lawyer.User.City,
+            PhoneNumber = lawyer.User.PhoneNumber,
+            ChamberAddress = lawyer.ChamberAddress,
             
             Specialization = lawyer.Specialization,
             BarAssociation = lawyer.BarAssociation,

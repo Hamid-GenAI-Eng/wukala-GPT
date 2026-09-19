@@ -35,6 +35,8 @@ public class CloudinaryService : IFileStorageService
             // Check if file is a video
             var isVideo = file.ContentType.StartsWith("video/");
 
+            var isPdf = file.ContentType.Contains("pdf") || file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+
             var uploadParams = isVideo 
                 ? new VideoUploadParams
                 {
@@ -44,10 +46,11 @@ public class CloudinaryService : IFileStorageService
                 : new RawUploadParams
                 {
                     File = new FileDescription(file.FileName, stream),
-                    Folder = folderName
+                    Folder = folderName,
+                    Type = "authenticated" // FIX: Raw files (like PDFs) are blocked by Cloudinary by default unless authenticated
                 };
 
-            if (!isVideo && file.ContentType.StartsWith("image/"))
+            if (!isVideo && !isPdf && file.ContentType.StartsWith("image/"))
             {
                 var imageUploadParams = new ImageUploadParams
                 {
@@ -78,22 +81,42 @@ public class CloudinaryService : IFileStorageService
         var segments = uri.Segments;
         
         var resourceType = ResourceType.Image;
-        if (fileUrl.Contains("/raw/upload/")) resourceType = ResourceType.Raw;
-        else if (fileUrl.Contains("/video/upload/")) resourceType = ResourceType.Video;
+        if (fileUrl.Contains("/raw/")) resourceType = ResourceType.Raw;
+        else if (fileUrl.Contains("/video/")) resourceType = ResourceType.Video;
+
+        var typeStr = fileUrl.Contains("/authenticated/") ? "authenticated" : "upload";
 
         var publicIdWithExtension = segments.Last();
-        var folderSegments = segments.Skip(5).Take(segments.Length - 6);
+        var startIndex = Array.FindIndex(segments, s => s.StartsWith("upload/") || s.StartsWith("authenticated/")) + 1;
+        if (segments[startIndex].StartsWith("v") && segments[startIndex].EndsWith("/")) startIndex++; // Skip version
+
+        var folderSegments = segments.Skip(startIndex).Take(segments.Length - startIndex - 1);
         
         var publicId = resourceType == ResourceType.Raw 
-            ? Uri.UnescapeDataString(publicIdWithExtension) // Raw needs extension
+            ? Uri.UnescapeDataString(publicIdWithExtension)
             : Path.GetFileNameWithoutExtension(Uri.UnescapeDataString(publicIdWithExtension));
 
         var fullPublicId = string.Join("", folderSegments) + publicId;
 
         var deleteParams = new DeletionParams(fullPublicId)
         {
-            ResourceType = resourceType
+            ResourceType = resourceType,
+            Type = typeStr
         };
         await _cloudinary.DestroyAsync(deleteParams);
+    }
+
+    public async Task<Stream> GetFileStreamAsync(string fileUrl)
+    {
+        var client = new HttpClient();
+        var response = await client.GetAsync(fileUrl, HttpCompletionOption.ResponseHeadersRead);
+        
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Failed to retrieve document from Cloudinary. Status: {response.StatusCode}. URL: {fileUrl}. Error: {errorContent}");
+        }
+
+        return await response.Content.ReadAsStreamAsync();
     }
 }

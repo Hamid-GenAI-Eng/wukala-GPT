@@ -12,6 +12,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AddHearingDialog } from './AddHearingDialog';
+import { PrintableWeekCalendar } from './PrintableWeekCalendar';
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -163,6 +166,38 @@ export default function HearingCalendar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [courtFilter, setCourtFilter] = useState<CourtType | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
+
+  const handlePrintWeek = async () => {
+    setIsPrinting(true);
+    const element = document.getElementById('printable-week-calendar');
+    if (!element) {
+      setIsPrinting(false);
+      return;
+    }
+    
+    const originalDisplay = element.style.display;
+    element.style.display = 'block';
+    
+    const opt = {
+      margin:       10,
+      filename:     `Weekly_Cause_List_${formatDateShort(getWeekDays(currentDate)[0]).replace(' ', '_')}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    };
+
+    try {
+      await html2pdf().set(opt).from(element).save();
+      toast({ title: 'PDF Downloaded', description: 'Weekly cause list generated successfully.' });
+    } catch (err) {
+      console.error('Failed to generate PDF', err);
+      toast({ variant: 'destructive', title: 'Generation Failed', description: 'Could not generate PDF.' });
+    } finally {
+      element.style.display = originalDisplay;
+      setIsPrinting(false);
+    }
+  };
 
   // Virtual Munshi States
   const [showMunshiDialog, setShowMunshiDialog] = useState(false);
@@ -392,8 +427,8 @@ export default function HearingCalendar() {
             <Button variant="outline" size="sm" className="text-xs font-sans h-8 gap-1.5" onClick={() => setShowFilters(!showFilters)}>
               <Filter className="h-3 w-3" /> Filters
             </Button>
-            <Button variant="outline" size="sm" className="text-xs font-sans h-8 gap-1.5">
-              <Printer className="h-3 w-3" /> Print Week
+            <Button variant="outline" size="sm" className="text-xs font-sans h-8 gap-1.5" onClick={handlePrintWeek} disabled={isPrinting}>
+              <Printer className="h-3 w-3" /> {isPrinting ? 'Generating PDF...' : 'Print Week'}
             </Button>
             <Button size="sm" className="bg-gradient-secondary font-sans text-xs gap-1.5 h-8 text-white" onClick={() => setShowMunshiDialog(true)}>
               <FileText className="h-3.5 w-3.5" /> Virtual Munshi AI
@@ -965,12 +1000,15 @@ export default function HearingCalendar() {
         </DialogContent>
       </Dialog>
 
-      <AddHearingDialog
+      <AddHearingDialog 
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
+        onSuccess={() => loadHearings()}
         cases={cases}
-        onSuccess={loadHearings}
       />
+
+      {/* Hidden Printable Calendar */}
+      <PrintableWeekCalendar hearings={filteredHearings} weekDays={getWeekDays(currentDate)} />
     </div>
   );
 }

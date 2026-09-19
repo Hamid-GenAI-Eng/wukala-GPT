@@ -19,18 +19,10 @@ public class TemplatesResponse
     public List<TemplateCategoryDto> Categories { get; set; } = new();
 }
 
-public class DraftGenerateRequest
+public class TemplateContentResponse
 {
-    [JsonPropertyName("template_path")]
-    public string TemplatePath { get; set; } = string.Empty;
-
-    [JsonPropertyName("case_facts")]
-    public string CaseFacts { get; set; } = string.Empty;
-}
-
-public class DraftGenerateResponse
-{
-    public string Draft { get; set; } = string.Empty;
+    [JsonPropertyName("content")]
+    public string Content { get; set; } = string.Empty;
 }
 
 public class DraftExportRequest
@@ -42,23 +34,18 @@ public class DraftExportRequest
     public string DocumentTitle { get; set; } = string.Empty;
 }
 
-public class ExtractFieldsRequest
+public class DocumentDraftDto
 {
-    [JsonPropertyName("template_path")]
-    public string TemplatePath { get; set; } = string.Empty;
+    public Guid Id { get; set; }
+    public string TemplateName { get; set; } = string.Empty;
+    public string HtmlContent { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public DateTime LastModifiedAt { get; set; }
 }
 
-public class ExtractFieldsResponse
+public class SaveDocumentDraftRequest
 {
-    [JsonPropertyName("fields")]
-    public List<TemplateFieldDto> Fields { get; set; } = new();
-}
-
-public class TemplateFieldDto
-{
-    [JsonPropertyName("id")]
-    public string Id { get; set; } = string.Empty;
-    
-    [JsonPropertyName("label")]
-    public string Label { get; set; } = string.Empty;
+    public Guid? Id { get; set; } // If null, creates new
+    public string TemplateName { get; set; } = string.Empty;
+    public string HtmlContent { get; set; } = string.Empty;
 }

@@ -68,7 +68,12 @@ public class SecurityAttackTests
     {
         // Arrange
         var db = GetInMemoryDbContext();
-        var handler = new CreateClientCommandHandler(db);
+        // Let's pass null for IDistributedCache and INotificationService since it's a test and they might be mocked
+        var handler = new WukalaGPT.Application.Features.Clients.CreateClientCommandHandler(
+            db, 
+            new Microsoft.Extensions.Caching.Distributed.MemoryDistributedCache(new Microsoft.Extensions.Options.OptionsWrapper<Microsoft.Extensions.Caching.Memory.MemoryDistributedCacheOptions>(new Microsoft.Extensions.Caching.Memory.MemoryDistributedCacheOptions())), 
+            new Moq.Mock<WukalaGPT.Application.Interfaces.INotificationService>().Object
+        );
         
         var payload = new CreateClientCommand
         {

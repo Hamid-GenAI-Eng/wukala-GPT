@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,7 @@ import {
   MessageSquare, ArrowLeft, Calendar, Clock, FileText, Shield,
   AlertTriangle, Tag, UserCheck, Eye, Send, PhoneCall, Video,
   Users, TrendingUp, UserPlus, Bell, CreditCard, ChevronRight,
-  CheckCircle2, XCircle, Edit, Trash2, Loader2
+  CheckCircle2, XCircle, Edit, Trash2, Loader2, Download
 } from 'lucide-react';
 import api from '@/services/api';
 
@@ -101,6 +101,7 @@ const interactionColors: Record<string, string> = {
 
 // ─── Component ────────────────────────────────────────────────────
 export default function ClientCRM() {
+  const { clientId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
@@ -114,6 +115,9 @@ export default function ClientCRM() {
   const [showLogInteraction, setShowLogInteraction] = useState(false);
   const [conflictQuery, setConflictQuery] = useState('');
   const [newInteraction, setNewInteraction] = useState({ type: 'call', summary: '' });
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [viewingDoc, setViewingDoc] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Dynamic states
   const [loading, setLoading] = useState(true);
@@ -136,6 +140,30 @@ export default function ClientCRM() {
   });
   const [addingClient, setAddingClient] = useState(false);
   const [availableCases, setAvailableCases] = useState<any[]>([]);
+
+  useEffect(() => {
+    async function loadClientDetails(id: string) {
+      try {
+        const clientBase = clientList.find(c => c.id === id);
+        if (clientBase) {
+           setSelectedClient({ ...clientBase, cases: [], interactions: [], documents: [] } as any);
+        }
+        setDetailTab('overview');
+        const details = await api.getClientDetail(id);
+        if (details) {
+           setSelectedClient(prev => prev?.id === id ? { ...prev, ...details } : (clientBase ? { ...clientBase, ...details } : details) as any);
+        }
+      } catch (error) {
+        console.error("Failed to load client details", error);
+      }
+    }
+
+    if (clientId) {
+      loadClientDetails(clientId);
+    } else {
+      setSelectedClient(null);
+    }
+  }, [clientId, clientList.length]);
 
   useEffect(() => {
     async function loadClients() {
@@ -193,8 +221,8 @@ export default function ClientCRM() {
     try {
       await api.archiveClient(id);
       setClientList(prev => prev.filter(c => c.id !== id));
-      if (selectedClient?.id === id) {
-        setSelectedClient(null);
+      if (clientId === id) {
+        navigate('/lawyer-dashboard/clients');
       }
       toast({ title: 'Success', description: 'Client deleted successfully.' });
     } catch (err) {
@@ -258,19 +286,8 @@ export default function ClientCRM() {
     }
   };
 
-  const handleClientClick = async (client: Client) => {
-    try {
-      // Show basic info immediately
-      setSelectedClient({ ...client, cases: [], interactions: [], documents: [] });
-      setDetailTab('overview');
-      // Fetch full details
-      const details = await api.getClientDetail(client.id);
-      if (details) {
-        setSelectedClient(prev => prev?.id === client.id ? { ...prev, ...details } : prev);
-      }
-    } catch (error) {
-      console.error("Failed to load client details", error);
-    }
+  const handleClientClick = (client: Client) => {
+    navigate('/lawyer-dashboard/clients/' + client.id);
   };
 
   const handleLogInteraction = async () => {
@@ -291,6 +308,73 @@ export default function ClientCRM() {
       console.error("Failed to log interaction", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!selectedClient) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingDoc(true);
+      const res = await api.uploadDocument(file);
+      if (res && (res as any).id) {
+         await api.shareDocumentToPortal(selectedClient.id, (res as any).id, { shared: true }).catch(console.error);
+      }
+      toast({ title: 'Success', description: 'Document uploaded successfully.' });
+      
+      // refresh client details
+      const details = await api.getClientDetail(selectedClient.id);
+      if (details) {
+         setSelectedClient(prev => prev ? { ...prev, ...details } as any : prev);
+      }
+    } catch (err: any) {
+      console.error("Failed to upload document", err);
+      toast({ title: 'Error', description: err.message || 'Failed to upload document.', variant: 'destructive' });
+    } finally {
+      setUploadingDoc(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDownloadDocument = async (doc: any) => {
+    if (!doc.url) {
+      toast({ title: 'Not available', description: 'Document download URL not provided.' });
+      return;
+    }
+    try {
+      toast({ title: "Downloading...", description: "Please wait while the document downloads." });
+      const response = await fetch(doc.url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = doc.fullName || 'document';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Download failed", err);
+      // Fallback
+      window.open(doc.url, '_blank');
+    }
+  };
+
+  const handleDeleteDocument = async (docId: string) => {
+    if (!selectedClient || !confirm('Are you sure you want to delete this document?')) return;
+    try {
+      await api.revokeDocumentAccess(selectedClient.id, docId).catch(console.error);
+      // Fallback optimistic UI update, or API delete
+      toast({ title: 'Success', description: 'Document deleted successfully.' });
+      setSelectedClient(prev => prev ? { 
+        ...prev, 
+        documents: prev.documents?.filter(d => d.id !== docId) || [] 
+      } as any : prev);
+    } catch (err: any) {
+      console.error("Failed to delete document", err);
+      toast({ title: 'Error', description: err.message || 'Failed to delete document.', variant: 'destructive' });
     }
   };
 
@@ -321,14 +405,13 @@ export default function ClientCRM() {
 
   // Stats
   const stats = useMemo(() => {
-    if (clientStats) return clientStats;
     return {
       total: clientList.length,
       active: clientList.filter(c => c.status === 'Active').length,
       vip: clientList.filter(c => c.vip).length,
       retentionAlerts: clientList.filter(c => c.retentionFlagged).length,
     };
-  }, [clientList, clientStats]);
+  }, [clientList]);
 
   if (loading) {
     return (
@@ -352,7 +435,7 @@ export default function ClientCRM() {
         >
           {/* Header */}
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedClient(null)}>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/lawyer-dashboard/clients')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div className="flex-1">
@@ -374,11 +457,6 @@ export default function ClientCRM() {
               <Button size="sm" variant="outline" className="text-xs h-8 gap-1.5" onClick={() => setShowLogInteraction(true)}>
                 <Plus className="h-3 w-3" /> Log Interaction
               </Button>
-              {selectedClient.portalEnabled && (
-                <Button size="sm" variant="outline" className="text-xs h-8 gap-1.5">
-                  <Eye className="h-3 w-3" /> Client Portal
-                </Button>
-              )}
             </div>
           </div>
 
@@ -410,8 +488,7 @@ export default function ClientCRM() {
               <TabsTrigger value="overview" className="text-xs font-sans h-7">Overview</TabsTrigger>
               <TabsTrigger value="cases" className="text-xs font-sans h-7">Cases ({selectedClient.cases.length})</TabsTrigger>
               <TabsTrigger value="communications" className="text-xs font-sans h-7">Communications ({selectedClient.interactions.length})</TabsTrigger>
-              <TabsTrigger value="documents" className="text-xs font-sans h-7">Documents ({selectedClient.documents.length})</TabsTrigger>
-              <TabsTrigger value="virtual_munshi" className="text-xs font-sans h-7 text-primary gap-1.5"><FileText className="h-3 w-3" /> Virtual Munshi</TabsTrigger>
+              <TabsTrigger value="documents" className="text-xs font-sans h-7">Documents</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="mt-4 space-y-4">
@@ -453,23 +530,6 @@ export default function ClientCRM() {
                       ))}
                     </div>
 
-                    <Separator className="my-3" />
-
-                    <h3 className="text-sm font-semibold font-sans text-foreground mb-2">Client Portal</h3>
-                    <div className="flex items-center gap-2">
-                      {selectedClient.portalEnabled ? (
-                        <>
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          <span className="text-xs font-sans text-green-600 font-medium">Enabled — Client can view case status</span>
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-xs font-sans text-muted-foreground">Not enabled</span>
-                          <Button size="sm" variant="outline" className="text-[10px] h-6 ml-auto">Enable Portal</Button>
-                        </>
-                      )}
-                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -550,7 +610,17 @@ export default function ClientCRM() {
             </TabsContent>
 
             <TabsContent value="documents" className="mt-4">
-              {selectedClient.documents.length === 0 ? (
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-semibold font-sans text-foreground">Client Documents</h3>
+                <div>
+                  <input type="file" className="hidden" ref={fileInputRef} onChange={handleDocumentUpload} />
+                  <Button size="sm" className="h-7 text-xs bg-primary text-primary-foreground gap-1.5" disabled={uploadingDoc} onClick={() => fileInputRef.current?.click()}>
+                    {uploadingDoc ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} 
+                    {uploadingDoc ? 'Uploading...' : 'Upload Document'}
+                  </Button>
+                </div>
+              </div>
+              {selectedClient.documents?.length === 0 || !selectedClient.documents ? (
                 <div className="text-center py-10">
                   <FileText className="h-10 w-10 text-muted-foreground/30 mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground font-sans">No documents shared yet</p>
@@ -565,85 +635,28 @@ export default function ClientCRM() {
                             <FileText className="h-4 w-4 text-primary" />
                           </div>
                           <div>
-                            <p className="text-xs font-semibold font-sans text-foreground">{doc.name}</p>
-                            <p className="text-[10px] text-muted-foreground font-sans">{doc.size} · Shared {doc.sharedDate}</p>
+                            <p className="text-xs font-semibold font-sans text-foreground">{doc.fullName || (doc as any).name || 'Document'}</p>
+                            <p className="text-[10px] text-muted-foreground font-sans">{doc.size || 'Unknown size'} · Shared {doc.sharedDate || 'recently'}</p>
                           </div>
                         </div>
-                        <Button variant="ghost" size="sm" className="text-xs h-7">View</Button>
+                        <div className="flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => (doc as any).url ? setViewingDoc(doc) : toast({title: 'Not available', description: 'Document view URL not provided by server.'})}>
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => handleDownloadDocument(doc)}>
+                            <Download className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteDocument(doc.id)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   ))}
                 </div>
               )}
             </TabsContent>
-
-            {/* Virtual Munshi Tab */}
-            <TabsContent value="virtual_munshi" className="mt-4 space-y-4">
-              <div className="rounded-lg bg-gradient-to-r from-primary/10 to-transparent border border-primary/20 p-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <MessageSquare className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold font-sans text-primary">AI Outbox (Virtual Munshi)</h3>
-                    <p className="text-xs text-muted-foreground font-sans">Review and dispatch localized WhatsApp notifications to {selectedClient.contactPerson}.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">Pending Notifications</p>
-                
-                {/* Mocked Pending Notification Item */}
-                <Card className="border-warning/30 bg-warning/5">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] text-warning border-warning/50 bg-warning/10">Draft</Badge>
-                        <span className="text-xs font-semibold text-foreground">Next Hearing Update</span>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground">Generated Just Now</span>
-                    </div>
-                    <div className="bg-card border border-border/50 rounded-lg p-3 mb-3 relative">
-                      <p className="text-xs font-sans leading-relaxed">
-                        Assalam o Alaikum {selectedClient.contactPerson},<br/><br/>
-                        Aap ki case (Ali vs State) ki agli tareekh 12 Oct ko fix ho gai hai. Courtroom 4 mein judge sahab sunwaai karenge. Waqt par pohnchna zaroori hai.<br/><br/>
-                        Regards,<br/>HamidTech Ventures
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline" className="text-xs h-8 text-primary border-primary hover:bg-primary/10 flex-1">
-                        <PhoneCall className="h-3 w-3 mr-1.5" /> Request Audio (Voice Note)
-                      </Button>
-                      <Button size="sm" className="bg-success text-success-foreground hover:bg-success/90 text-xs h-8 px-5">
-                        <Send className="h-3 w-3 mr-1.5" /> Approve & Send
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                {/* Mocked Sent Notification Item */}
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1 mt-6">Sent Notifications</p>
-                <Card className="border-border/50 opacity-70">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] text-success border-success/50 bg-success/10">Sent via WhatsApp</Badge>
-                        <span className="text-xs font-semibold text-foreground">Document Required Notice</span>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground">Oct 5, 2023</span>
-                    </div>
-                    <div className="bg-card border border-border/50 rounded-lg p-3 relative">
-                      <p className="text-xs font-sans leading-relaxed">
-                        Assalam o Alaikum, Barae meharbani apni CNIC ki copy office mein jama karwa dein. Shukriya.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
           </Tabs>
-
           {/* Log Interaction Dialog */}
           <Dialog open={showLogInteraction} onOpenChange={setShowLogInteraction}>
             <DialogContent className="max-w-md">
@@ -681,6 +694,38 @@ export default function ClientCRM() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          {/* Document Viewer Dialog */}
+          <Dialog open={!!viewingDoc} onOpenChange={(open) => !open && setViewingDoc(null)}>
+            <DialogContent className="max-w-4xl h-[85vh] p-0 flex flex-col">
+              <DialogHeader className="px-4 py-3 border-b flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <DialogTitle className="text-base font-sans font-semibold">{viewingDoc?.fullName || 'Document Viewer'}</DialogTitle>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => viewingDoc && handleDownloadDocument(viewingDoc)}
+                    className="h-8 gap-1.5"
+                  >
+                    <Download className="h-4 w-4" /> Download
+                  </Button>
+                </div>
+              </DialogHeader>
+              <div className="flex-1 bg-muted/30 relative">
+                {viewingDoc?.url ? (
+                  <iframe 
+                    src={viewingDoc.url} 
+                    className="w-full h-full border-0"
+                    title="Document Viewer"
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    <p>No preview available for this document.</p>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+
         </motion.div>
       </AnimatePresence>
     );
@@ -711,7 +756,7 @@ export default function ClientCRM() {
           { label: 'Total Clients', value: stats.total, icon: Users, color: 'text-primary' },
           { label: 'Active', value: stats.active, icon: UserCheck, color: 'text-green-600' },
           { label: 'VIP Clients', value: stats.vip, icon: Star, color: 'text-gold' },
-          { label: 'Retention Alerts', value: stats.retentionFlaggeds, icon: Bell, color: 'text-destructive' },
+          { label: 'Retention Alerts', value: stats.retentionAlerts, icon: Bell, color: 'text-destructive' },
         ].map((s, i) => (
           <Card key={i} className="border-border/50">
             <CardContent className="p-3">
@@ -757,12 +802,12 @@ export default function ClientCRM() {
       {/* Tabs */}
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="bg-secondary/50 h-9">
-          <TabsTrigger value="all" className="text-xs font-sans h-7">All ({stats.total})</TabsTrigger>
-          <TabsTrigger value="active" className="text-xs font-sans h-7">Active ({stats.active})</TabsTrigger>
-          <TabsTrigger value="vip" className="text-xs font-sans h-7">VIP ({stats.vip})</TabsTrigger>
+          <TabsTrigger value="all" className="text-xs font-sans h-7">All</TabsTrigger>
+          <TabsTrigger value="active" className="text-xs font-sans h-7">Active</TabsTrigger>
+          <TabsTrigger value="vip" className="text-xs font-sans h-7">VIP</TabsTrigger>
           <TabsTrigger value="retention" className="text-xs font-sans h-7">
-            {stats.retentionFlaggeds > 0 && <Bell className="h-3 w-3 mr-1 text-destructive" />}
-            Alerts ({stats.retentionFlaggeds})
+            {stats.retentionAlerts > 0 && <Bell className="h-3 w-3 mr-1 text-destructive" />}
+            Alerts
           </TabsTrigger>
           <TabsTrigger value="inactive" className="text-xs font-sans h-7">Inactive</TabsTrigger>
         </TabsList>
@@ -798,9 +843,6 @@ export default function ClientCRM() {
                       <Bell className="h-3 w-3 text-destructive" />
                     </div>
                   )}
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={e => e.stopPropagation()}>
-                    <MoreVertical className="h-3.5 w-3.5" />
-                  </Button>
                 </div>
               </div>
 
@@ -1029,13 +1071,9 @@ export default function ClientCRM() {
                 </Select>
               </div>
             )}
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-2 mb-4">
               <input type="checkbox" id="vip" checked={newClientData.vip} onChange={e => setNewClientData({...newClientData, vip: e.target.checked})} className="rounded border-border" />
               <label htmlFor="vip" className="text-xs font-sans">Mark as VIP client</label>
-            </div>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="portal" className="rounded border-border" />
-              <label htmlFor="portal" className="text-xs font-sans">Enable client portal access</label>
             </div>
           </div>
           <DialogFooter>

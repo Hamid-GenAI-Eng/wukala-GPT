@@ -4,31 +4,35 @@ from langchain_core.messages import SystemMessage
 
 def analysis_node(state: GraphState):
     messages = state.get("messages", [])
+    evidence = state.get("evidence", [])
     context_docs = state.get("context_documents", [])
     
+    # Use evidence if available, else fallback to context_documents
+    items = evidence if evidence else context_docs
+    
     context_text = ""
-    for i, doc in enumerate(context_docs):
-        meta = doc.get("metadata", {})
-        source = meta.get("source", "Unknown Source")
-        context_text += f"--- Document {i+1} [{source}] ---\n{doc.get('content')}\n\n"
+    for i, item in enumerate(items):
+        source = item.get("source") or item.get("document_id") or "Unknown Source"
+        text = item.get("text") or item.get("content") or ""
+        context_text += f"--- Document {i+1} [{source}] ---\n{text}\n\n"
         
+    evidence_status = state.get("evidence_status", "UNKNOWN")
+    
     system_prompt = f"""You are Mizan AI's Elite Factual & Legal Analysis Agent.
 Your job is to read the user's query and the retrieved context documents, and synthesize a rigorous legal analysis.
 DO NOT provide an executive summary, and DO NOT provide next steps. Just the core analysis.
 
-You must structure your response strictly using the IRAC methodology:
-**Issue Identification:**
-State the specific legal question clearly in 1-2 sentences.
+Evidence Status for this query is: {evidence_status}
+If Evidence Status is NO_EVIDENCE or if the retrieved documents do not contain the answer, you MUST state exactly: "insufficient authority in retrieved sources" and refuse to answer. Do NOT guess or use general knowledge.
 
-**Relevant Authority (The Rule):**
-List the applicable statutory laws, regulations, and case precedents retrieved from the context.
-You MUST rely only on the provided context. If the context is empty, explicitly state that general knowledge is being used.
+You must reason internally from the retrieved evidence. Determine and output the following sections based ONLY on the evidence:
+**Legal Issue(s):** State the specific legal question clearly.
+**Applicable Legislation/Sections:** List the applicable statutory laws retrieved from the context.
+**Relevant Cases/Principles:** List precedents and legal principles from the context.
+**Application to Facts:** Apply the rules you just identified to the specific facts mentioned by the user.
+**Exceptions/Limitations:** Any exceptions or conflicting authorities noted in the context.
 
-**Application to Facts:**
-Apply the rules you just identified to the specific facts mentioned by the user. 
-Be highly logical and objective.
-
-CRITICAL INSTRUCTION: If the user asks about a specific case law, precedent, or statute that is NOT explicitly present in the Retrieved Context, you MUST explicitly state: "I cannot verify this precedent as no specific record was found in the retrieved context." DO NOT hallucinate case facts.
+CRITICAL INSTRUCTION: Never print a citation marker without a real matching source from the Retrieved Context. DO NOT invent or hallucinate citations under any circumstances.
 
 Retrieved Context:
 {context_text}
@@ -43,9 +47,10 @@ Retrieved Context:
         
         # Build the citations block
         citations_text = ""
-        if context_docs:
-            for i, doc in enumerate(context_docs):
-                citations_text += f"[{i+1}] Source: {doc.get('metadata', {}).get('source', 'Unknown')}\n"
+        if items:
+            for i, item in enumerate(items):
+                source = item.get("source") or item.get("document_id") or "Unknown"
+                citations_text += f"[{i+1}] Source: {source}\n"
         else:
             citations_text = "No specific documents were retrieved for this query."
         

@@ -13,5 +13,7 @@ public interface IAuthService
     Task ResetPasswordAsync(ResetPasswordDto dto);
     Task ChangePasswordAsync(Guid userId, ChangePasswordDto dto);
     Task<UserProfileDto> GetMeAsync(Guid userId);
+    Task UpdateMeAsync(Guid userId, UpdateProfileDto dto);
     Task LogoutAsync(string token);
+    Task AcceptInviteAsync(AcceptInviteDto dto);
 }

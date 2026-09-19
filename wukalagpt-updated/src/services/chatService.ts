@@ -17,7 +17,8 @@ class ChatService {
       return;
     }
 
-    const hubUrl = `${import.meta.env.VITE_API_BASE_URL.replace('/api', '')}/chathub`;
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5285/api/v1";
+    const hubUrl = `${baseUrl.replace(/\/api(\/v\d+)?$/, '')}/chathub`;
     
     this.connection = new signalR.HubConnectionBuilder()
       .withUrl(hubUrl, {

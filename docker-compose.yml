@@ -70,14 +70,17 @@ services:
     volumes:
       - ./Mizan.AI:/app
       - mizan_hf_cache:/root/.cache/huggingface
+      - mizan_fastembed_cache:/root/.local/share/fastembed
     depends_on:
       - qdrant
     env_file:
       - ./Mizan.AI/.env
     environment:
       - QDRANT_HOST=qdrant
+      - TEMPLATES_DIR=/app/Legal drafting templates (Word)
     restart: unless-stopped
 
 volumes:
   wukala_pgdata_local:
   mizan_hf_cache:
+  mizan_fastembed_cache:

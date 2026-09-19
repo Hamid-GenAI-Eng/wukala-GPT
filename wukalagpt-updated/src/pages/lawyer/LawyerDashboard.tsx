@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/services/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -30,18 +31,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import DashboardOverview from './components/DashboardOverview';
-import CaseManagement from './components/CaseManagement';
-import HearingCalendar from './components/HearingCalendar';
-import ClientCRM from './components/ClientCRM';
-import DocumentDrafting from './components/DocumentDrafting';
-import FeeBilling from './components/FeeBilling';
-import SmartNotifications from './components/SmartNotifications';
-import PracticeAnalytics from './components/PracticeAnalytics';
-import TeamManagement from './components/TeamManagement';
-import DocumentVault from './components/DocumentVault';
-import MessagingPage from '@/pages/MessagingPage';
-import ChatPage from '@/pages/ChatPage';
+
 
 const sidebarItems = [
   { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
@@ -51,7 +41,7 @@ const sidebarItems = [
   { id: 'calendar', label: 'Hearing Calendar', icon: Calendar },
   { id: 'clients', label: 'Client CRM', icon: Users },
   { id: 'documents', label: 'Document Drafting', icon: FileText },
-  { id: 'billing', label: 'Fee & Billing', icon: DollarSign },
+  { id: 'billing', label: 'Finance', icon: DollarSign },
   { id: 'notifications', label: 'Notifications', icon: Bell },
   { id: 'analytics', label: 'Practice Analytics', icon: BarChart3 },
   { id: 'team', label: 'Team Management', icon: UsersRound },
@@ -59,41 +49,58 @@ const sidebarItems = [
 ];
 
 export default function LawyerDashboard() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { isDark, toggleTheme } = useTheme();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeSection = searchParams.get('tab') || 'overview';
   
-  const setActiveSection = (section: string) => {
-    setSearchParams({ tab: section });
-  };
+  const [unreadCount, setUnreadCount] = useState(0);
+  const prevUnreadRef = useRef(-1); // -1 to indicate initial load
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const data = await api.getNotifications('all');
+        const count = data.filter((n: any) => !n.read).length;
+        setUnreadCount(count);
+
+        // Play sound if count increases after initial load
+        if (prevUnreadRef.current !== -1 && count > prevUnreadRef.current) {
+          const audio = new Audio('/notification.mp3');
+          audio.play().catch(e => console.log('Audio autoplay prevented'));
+        }
+        prevUnreadRef.current = count;
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    fetchCount();
+    const interval = setInterval(fetchCount, 30000); // Poll every 30 seconds
+
+    const handleUpdate = () => fetchCount();
+    window.addEventListener('notifications_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('notifications_updated', handleUpdate);
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Parse active section from URL (e.g. /lawyer-dashboard/cases -> cases)
+  const pathParts = location.pathname.split('/');
+  const activeSection = pathParts[2] || 'overview';
   
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+
+
 
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
-  const renderContent = () => {
-    switch (activeSection) {
-      case 'overview': return <DashboardOverview onNavigate={setActiveSection} />;
-      case 'messages': return <MessagingPage />;
-      case 'mizan-ai': return <ChatPage />;
-      case 'cases': return <CaseManagement />;
-      case 'calendar': return <HearingCalendar />;
-      case 'clients': return <ClientCRM />;
-      case 'documents': return <DocumentDrafting />;
-      case 'billing': return <FeeBilling />;
-      case 'notifications': return <SmartNotifications />;
-      case 'analytics': return <PracticeAnalytics />;
-      case 'team': return <TeamManagement />;
-      case 'vault': return <DocumentVault />;
-      default: return <DashboardOverview onNavigate={setActiveSection} />;
-    }
-  };
+
 
   const activeItem = sidebarItems.find(i => i.id === activeSection);
   const isFullBleed = activeSection === 'messages' || activeSection === 'mizan-ai';
@@ -140,7 +147,7 @@ export default function LawyerDashboard() {
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveSection(item.id)}
+                onClick={() => navigate(`/lawyer-dashboard/${item.id}`)}
                 className={cn(
                   'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium font-sans transition-all duration-150 group relative',
                   isActive
@@ -229,7 +236,7 @@ export default function LawyerDashboard() {
                   return (
                     <button
                       key={item.id}
-                      onClick={() => { setActiveSection(item.id); setMobileMenuOpen(false); }}
+                      onClick={() => { navigate(`/lawyer-dashboard/${item.id}`); setMobileMenuOpen(false); }}
                       className={cn(
                         'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium font-sans transition-all duration-150',
                         isActive
@@ -298,10 +305,12 @@ export default function LawyerDashboard() {
               variant="ghost"
               size="icon"
               className="h-9 w-9 relative"
-              onClick={() => setActiveSection('notifications')}
+              onClick={() => navigate('/lawyer-dashboard/notifications')}
             >
               <Bell className="h-[18px] w-[18px]" />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-destructive rounded-full" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-destructive rounded-full" />
+              )}
             </Button>
             <Button
               variant="ghost"
@@ -329,7 +338,7 @@ export default function LawyerDashboard() {
               transition={{ duration: 0.2 }}
               className={isFullBleed ? "h-full w-full p-0" : "p-4 lg:p-6"}
             >
-              {renderContent()}
+              <Outlet />
             </motion.div>
           </AnimatePresence>
         </main>

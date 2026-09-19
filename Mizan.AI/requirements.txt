@@ -24,3 +24,6 @@ pytest
 pytest-asyncio
 pytest-xdist
 beautifulsoup4
+langchain-google-genai
+langchain-ollama
+mammoth

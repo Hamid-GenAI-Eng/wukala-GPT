@@ -5,10 +5,13 @@ using WukalaGPT.Application.DTOs.Lawyer;
 using WukalaGPT.Application.Interfaces;
 using WukalaGPT.Domain.Enums;
  
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 [Authorize(Roles = "Admin")]
 public class AdminController : ControllerBase
 {

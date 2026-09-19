@@ -1,0 +1,65 @@
+[
+  {
+    "id": "q_001_en",
+    "query": "What are the grounds for bail under section 497 of CrPC?",
+    "language": "en",
+    "task_type": "statutory_lookup",
+    "expected_behavior": "retrieve",
+    "answerable": true,
+    "explicit_entities": {
+      "statutes": ["CrPC"],
+      "sections": ["497"]
+    },
+    "relevant_documents": [
+      { "document_id": "CrPC_1898", "relevance": 3 }
+    ],
+    "relevant_chunks": [
+      { "chunk_id": "CrPC_1898_s497", "relevance": 3 }
+    ],
+    "notes": "Classic exact section lookup."
+  },
+  {
+    "id": "q_002_roman_ur",
+    "query": "497 mein further inquiry kya hoti hai",
+    "language": "roman_ur",
+    "task_type": "conceptual",
+    "expected_behavior": "retrieve",
+    "answerable": true,
+    "explicit_entities": {
+      "sections": ["497"]
+    },
+    "relevant_documents": [
+      { "document_id": "CrPC_1898", "relevance": 3 }
+    ],
+    "relevant_chunks": [
+      { "chunk_id": "CrPC_1898_s497", "relevance": 2 }
+    ],
+    "notes": "Roman Urdu query asking about a specific legal term within a section."
+  },
+  {
+    "id": "q_003_ur",
+    "query": "عدالت bail kin grounds par دے سکتی ہے",
+    "language": "mixed",
+    "task_type": "conceptual",
+    "expected_behavior": "retrieve",
+    "answerable": true,
+    "explicit_entities": {},
+    "relevant_documents": [],
+    "relevant_chunks": [],
+    "notes": "Mixed Urdu/English conceptual query."
+  },
+  {
+    "id": "q_004_en_false_premise",
+    "query": "Under which section of the Pakistan Penal Code is a contract breach a capital offense?",
+    "language": "en",
+    "task_type": "false_premise",
+    "expected_behavior": "reject_false_premise",
+    "answerable": false,
+    "explicit_entities": {
+      "statutes": ["Pakistan Penal Code"]
+    },
+    "relevant_documents": [],
+    "relevant_chunks": [],
+    "notes": "Contract breach is civil, not a capital offense in PPC."
+  }
+]

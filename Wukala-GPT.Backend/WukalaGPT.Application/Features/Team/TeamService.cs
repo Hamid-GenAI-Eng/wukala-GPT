@@ -8,6 +8,7 @@ using WukalaGPT.Application.DTOs.Team;
 using WukalaGPT.Application.Interfaces;
 using WukalaGPT.Domain.Entities;
 using WukalaGPT.Domain.Enums;
+using Hangfire;
 
 namespace WukalaGPT.Application.Features.Team;
 
@@ -85,13 +86,34 @@ public class TeamService : ITeamService
         }
 
         var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == request.Email.ToLower());
+        var token = Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace("+", "").Replace("/", "").Replace("=", "");
+        var resetLink = $"https://www.wukala-gpt.app/accept-invite?token={token}&email={request.Email}";
+        
+        var emailHtml = $@"
+        <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eaeaea; border-radius: 10px; background-color: #fcfcfc;'>
+            <div style='text-align: center; margin-bottom: 30px;'>
+                <h1 style='color: #1a365d; margin: 0;'>Wukala GPT</h1>
+                <p style='color: #718096; font-size: 16px;'>Firm Team Invitation</p>
+            </div>
+            <div style='background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);'>
+                <h2 style='color: #2d3748; margin-top: 0;'>You've been invited!</h2>
+                <p style='color: #4a5568; line-height: 1.6;'>You have been invited to join a Law Firm on Wukala GPT as a <strong>{request.Role}</strong>.</p>
+                <p style='color: #4a5568; line-height: 1.6; margin-bottom: 30px;'>To accept this invitation and securely access your new workspace, please click the button below to set your password and complete your registration.</p>
+                <div style='text-align: center;'>
+                    <a href='{resetLink}' style='display: inline-block; background-color: #2563eb; color: white; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; font-size: 16px;'>Accept Invitation</a>
+                </div>
+            </div>
+            <div style='text-align: center; margin-top: 30px; color: #a0aec0; font-size: 14px;'>
+                <p>If you did not expect this invitation, you can safely ignore this email.</p>
+            </div>
+        </div>";
 
         if (existingUser != null)
         {
             existingUser.FirmId = firmId;
             existingUser.StaffRole = request.Role;
-            await _emailService.SendEmailAsync(request.Email, "You've been added to a Wukala-GPT Firm Team", 
-                $"<p>You have been joined into a firm on Wukala-GPT as a <b>{request.Role}</b>. Login to view your new workspace.</p>");
+            existingUser.PasswordResetToken = token;
+            existingUser.ResetTokenExpiry = DateTime.UtcNow.AddDays(7);
         }
         else
         {
@@ -103,15 +125,19 @@ public class TeamService : ITeamService
                 IsActive = false,
                 Role = UserRole.Lawyer,
                 FirstName = request.Email.Split('@')[0], 
-                LastName = ""
+                LastName = "",
+                PasswordResetToken = token,
+                ResetTokenExpiry = DateTime.UtcNow.AddDays(7)
             };
             _context.Users.Add(newUser);
-            await _emailService.SendEmailAsync(request.Email, "Invitation to join Wukala-GPT Firm Team", 
-                $"<p>You've been invited to join a firm on Wukala-GPT as a <b>{request.Role}</b>. Please complete your registration via the platform to activate your account.</p>");
         }
 
         await _context.SaveChangesAsync(default);
 
+        _logger.LogInformation("Invitation Link for {Email}: {Link}", request.Email, resetLink);
+        
+        BackgroundJob.Enqueue(() => _emailService.SendEmailAsync(request.Email, "Invitation to join Wukala-GPT Firm Team", emailHtml));
+        
         await LogActivityAsync(firmId, currentUserId, "Invited team member", request.Email, FirmActivityType.Other);
     }
 
@@ -139,15 +165,13 @@ public class TeamService : ITeamService
 
     public async Task<StaffTaskDto> CreateTaskAsync(Guid firmId, Guid assignedBy, StaffTaskDto request)
     {
-        // Clean name lookup matching for tasks
-        var cleanedName = request.AssignedTo.Replace("Adv. ", "").Trim();
-        var userToken = cleanedName.Split(' ').LastOrDefault() ?? "";
-        
-        var user = await _context.Users.FirstOrDefaultAsync(u => u.FirmId == firmId && 
-                        (u.LastName.Contains(userToken) || u.FirstName.Contains(userToken))) 
-                   ?? await _context.Users.FirstOrDefaultAsync(u => u.FirmId == firmId);
+        if (!request.AssignedToUserId.HasValue)
+        {
+            throw new Exception("Assignee must be specified via explicit ID.");
+        }
 
-        if(user == null) throw new Exception("Assignee not found.");
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.FirmId == firmId && u.Id == request.AssignedToUserId.Value);
+        if(user == null) throw new Exception("Assignee not found in your firm.");
 
         var task = new StaffTask
         {
@@ -257,6 +281,7 @@ public class TeamService : ITeamService
             {
                 user.StaffRole = roleEnum;
                 await _context.SaveChangesAsync(default);
+                await LogActivityAsync(firmId, memberId, "Updated role", $"Role changed to {newRole}", FirmActivityType.Other);
             }
         }
     }
@@ -269,6 +294,7 @@ public class TeamService : ITeamService
             user.FirmId = null;
             user.StaffRole = null;
             await _context.SaveChangesAsync(default);
+            await LogActivityAsync(firmId, memberId, "Removed member from firm", user.Email, FirmActivityType.Other);
         }
     }
 }

@@ -1,14 +1,19 @@
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WukalaGPT.Application.DTOs.AiChat;
 using WukalaGPT.Application.Interfaces;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 [Authorize]
+    [EnableRateLimiting("AiLimiter")]
 public class AiChatController : ControllerBase
 {
     private readonly IMizanAiChatService _aiChatService;
@@ -26,19 +31,32 @@ public class AiChatController : ControllerBase
         return userId;
     }
 
+    public class CreateSessionRequest { public string Title { get; set; } = string.Empty; }
+
     [HttpPost("sessions")]
-    public async Task<IActionResult> CreateSession([FromBody] string title)
+    public async Task<IActionResult> CreateSession([FromBody] CreateSessionRequest request)
     {
         try
         {
             var userId = GetCurrentUserId();
-            var session = await _aiChatService.CreateSessionAsync(userId, title);
+            var session = await _aiChatService.CreateSessionAsync(userId, request.Title);
             return Ok(session);
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[DEBUG ERROR] CreateSession: {ex.ToString()}");
             return BadRequest(new { message = ex.Message });
         }
+    }
+
+    public class LogRequest { public string Error { get; set; } = string.Empty; }
+
+    [HttpPost("log")]
+    [AllowAnonymous]
+    public IActionResult LogError([FromBody] LogRequest request)
+    {
+        Console.WriteLine($"[FRONTEND ERROR LOG] {request.Error}");
+        return Ok();
     }
 
     public class UpdateTitleRequest { public string Title { get; set; } = string.Empty; }
@@ -159,9 +177,17 @@ public class AiChatController : ControllerBase
         {
             return Forbid();
         }
+        catch (TaskCanceledException ex)
+        {
+            return StatusCode(504, new { message = "MizanAI timed out while processing the request. This may happen if AI models are being loaded or inference took too long.", details = ex.Message });
+        }
+        catch (TimeoutException ex)
+        {
+            return StatusCode(504, new { message = "MizanAI connection timed out.", details = ex.Message });
+        }
         catch (Exception ex)
         {
-            return BadRequest(new { message = ex.Message });
+            return StatusCode(500, new { message = "An internal error occurred.", details = ex.Message });
         }
     }
 
@@ -184,15 +210,20 @@ public class AiChatController : ControllerBase
         }
     }
 
+    public class TtsRequestDto
+    {
+        public string text { get; set; }
+    }
+
     [HttpPost("tts")]
-    public async Task<IActionResult> GenerateTts([FromBody] string text)
+    public async Task<IActionResult> GenerateTts([FromBody] TtsRequestDto request)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(text))
+            if (request == null || string.IsNullOrWhiteSpace(request.text))
                 return BadRequest(new { message = "Text cannot be empty." });
 
-            var stream = await _aiChatService.GenerateTtsAsync(text);
+            var stream = await _aiChatService.GenerateTtsAsync(request.text);
             return File(stream, "audio/mpeg");
         }
         catch (Exception ex)

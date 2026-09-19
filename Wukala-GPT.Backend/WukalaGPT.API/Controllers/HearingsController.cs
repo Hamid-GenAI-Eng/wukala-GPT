@@ -8,10 +8,13 @@ using WukalaGPT.Application.Interfaces;
 
 using System.Security.Claims;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 [Authorize]
 public class HearingsController : ControllerBase
 {

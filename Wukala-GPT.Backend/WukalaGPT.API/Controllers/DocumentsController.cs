@@ -5,18 +5,23 @@ using WukalaGPT.Application.DTOs.Document;
 using WukalaGPT.Application.Interfaces;
 using WukalaGPT.Domain.Enums;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
-[Authorize(Roles = "Lawyer, Client")] // Accessible to both roles
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
+[Authorize(Roles = "Lawyer, Client", Policy = "NotJuniorLawyer")] // Accessible to both roles, but Junior Lawyers restricted
 public class DocumentsController : ControllerBase
 {
     private readonly IDocumentService _documentService;
+    private readonly IFileStorageService _fileStorageService;
 
-    public DocumentsController(IDocumentService documentService)
+    public DocumentsController(IDocumentService documentService, IFileStorageService fileStorageService)
     {
         _documentService = documentService;
+        _fileStorageService = fileStorageService;
     }
 
     private Guid GetUserId()
@@ -81,6 +86,29 @@ public class DocumentsController : ControllerBase
         catch (Exception ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("{id}/download")]
+    public async Task<IActionResult> DownloadDocument(Guid id)
+    {
+        try
+        {
+            var document = await _documentService.GetDocumentAsync(GetUserId(), id);
+            
+            // Fetch the file securely using Cloudinary Signed URLs via our storage service
+            var stream = await _fileStorageService.GetFileStreamAsync(document.Url);
+
+            return File(stream, document.MimeType ?? "application/octet-stream", document.Name ?? "document");
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("DOWNLOAD ERROR: " + ex.ToString());
+            return StatusCode(500, new { message = "An error occurred while downloading the document. " + ex.Message, stackTrace = ex.ToString() });
         }
     }
 

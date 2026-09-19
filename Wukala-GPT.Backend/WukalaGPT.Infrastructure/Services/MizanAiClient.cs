@@ -51,7 +51,6 @@ public class MizanAiClient : IMizanAiClient
 
     public async Task<MizanAiChatResponse> SendMessageAsync(MizanAiChatRequest request)
     {
-        // Dynamically generate a short-lived service token for this request
         var serviceToken = GenerateServiceToken();
         _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceToken);
 
@@ -78,16 +77,16 @@ public class MizanAiClient : IMizanAiClient
         return result ?? new WukalaGPT.Application.DTOs.Drafting.TemplatesResponse();
     }
 
-    public async Task<WukalaGPT.Application.DTOs.Drafting.DraftGenerateResponse> GenerateDraftAsync(WukalaGPT.Application.DTOs.Drafting.DraftGenerateRequest request)
+    public async Task<WukalaGPT.Application.DTOs.Drafting.TemplateContentResponse> GetTemplateContentAsync(string templatePath)
     {
         var serviceToken = GenerateServiceToken();
         _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceToken);
 
-        var response = await _httpClient.PostAsJsonAsync("/api/v1/drafting/generate", request);
+        var response = await _httpClient.GetAsync($"/api/v1/drafting/template-content?path={Uri.EscapeDataString(templatePath)}");
         response.EnsureSuccessStatusCode();
 
-        var result = await response.Content.ReadFromJsonAsync<WukalaGPT.Application.DTOs.Drafting.DraftGenerateResponse>();
-        return result ?? new WukalaGPT.Application.DTOs.Drafting.DraftGenerateResponse();
+        var result = await response.Content.ReadFromJsonAsync<WukalaGPT.Application.DTOs.Drafting.TemplateContentResponse>();
+        return result ?? new WukalaGPT.Application.DTOs.Drafting.TemplateContentResponse();
     }
 
     public async Task<byte[]> ExportDraftToDocxAsync(WukalaGPT.Application.DTOs.Drafting.DraftExportRequest request)
@@ -146,17 +145,6 @@ public class MizanAiClient : IMizanAiClient
         response.EnsureSuccessStatusCode();
         
         return await response.Content.ReadAsStreamAsync();
-    }
-    public async Task<WukalaGPT.Application.DTOs.Drafting.ExtractFieldsResponse> ExtractFieldsAsync(WukalaGPT.Application.DTOs.Drafting.ExtractFieldsRequest request)
-    {
-        var serviceToken = GenerateServiceToken();
-        _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceToken);
-
-        var response = await _httpClient.PostAsJsonAsync("/api/v1/drafting/extract-fields", request);
-        response.EnsureSuccessStatusCode();
-
-        var result = await response.Content.ReadFromJsonAsync<WukalaGPT.Application.DTOs.Drafting.ExtractFieldsResponse>();
-        return result ?? new WukalaGPT.Application.DTOs.Drafting.ExtractFieldsResponse();
     }
 
     public async Task<Stream> GetTemplateFileAsync(string templatePath)

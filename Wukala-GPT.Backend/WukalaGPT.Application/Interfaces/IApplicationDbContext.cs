@@ -9,6 +9,7 @@ public interface IApplicationDbContext
     DbSet<LawyerProfile> LawyerProfiles { get; }
     DbSet<ClientProfile> ClientProfiles { get; }
     DbSet<LegalDocument> LegalDocuments { get; }
+    DbSet<DocumentDraft> DocumentDrafts { get; }
     DbSet<ChatSession> ChatSessions { get; }
     DbSet<Message> Messages { get; }
     DbSet<Conversation> Conversations { get; }

@@ -6,11 +6,14 @@ using Microsoft.AspNetCore.SignalR;
 using WukalaGPT.API.Hubs;
 using WukalaGPT.Domain.Enums;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
-[Authorize] // Both Lawyers and Clients can use messaging
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
+[Authorize(Policy = "NotJuniorLawyer")] // Both Lawyers and Clients can use messaging, but Junior Lawyers are restricted
 public class MessagesController : ControllerBase
 {
     private readonly IMessagingService _messagingService;

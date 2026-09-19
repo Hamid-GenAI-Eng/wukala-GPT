@@ -23,6 +23,7 @@ public class StaffTaskDto
     public Guid Id { get; set; }
     public string Title { get; set; } = string.Empty;
     public string AssignedTo { get; set; } = string.Empty;
+    public Guid? AssignedToUserId { get; set; }
     public string AssignedBy { get; set; } = string.Empty;
     public DateTime DueDate { get; set; }
     public string Priority { get; set; } = string.Empty;

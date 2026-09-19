@@ -3,7 +3,7 @@ import logging
 import uuid
 import os
 import re
-from mizan_ai.ingestion.chunker import chunk_text
+from mizan_ai.ingestion.legal_chunker import chunk_legal_text
 from mizan_ai.services.qdrant_service import qdrant_service
 from mizan_ai.services.embedding_service import embedding_service
 
@@ -41,19 +41,8 @@ def extract_chunks_from_document(file_path: str, filename: str) -> list[dict]:
         logger.warning(f"No text extracted from {filename}")
         return []
     
-    # Try to extract citation if available in filename or text
-    citation_match = re.search(r'(PLD|SCMR|PCrLJ|YLR|CLC)\s*\d+\s*[A-Za-z]+\s*\d+', text_content[:1000])
-    citation = citation_match.group(0) if citation_match else "Citation not found"
-    
-    metadata = {
-        "citation": citation,
-        "court": "Supreme Court of Pakistan" if "SCMR" in citation or "Supreme Court" in text_content[:1000] else "Unknown Court",
-        "date": "Unknown Date",
-        "source_file": filename
-    }
-    
-    # Chunking
-    chunks = chunk_text(text_content, metadata)
+    # Chunking using structural legal chunker
+    chunks = chunk_legal_text(text_content, filename)
     
     result = []
     for idx, chunk in enumerate(chunks):
@@ -63,9 +52,14 @@ def extract_chunks_from_document(file_path: str, filename: str) -> list[dict]:
             "text": chunk["text"],
             "payload": {
                 "text": chunk["text"],
-                "citation": metadata["citation"],
-                "court": metadata["court"],
-                "source_file": filename
+                "citation": chunk["metadata"].get("citation"),
+                "court": chunk["metadata"].get("court"),
+                "section": chunk["metadata"].get("section"),
+                "title": chunk["metadata"].get("title"),
+                "document_type": chunk["metadata"].get("document_type"),
+                "source_file": filename,
+                "canonical_references": chunk["metadata"].get("canonical_references", []),
+                "parent_chunk_id": None # Tracked later if we do parent-child hierarchy properly
             }
         })
         

@@ -7,11 +7,14 @@ using System.Threading.Tasks;
 using WukalaGPT.Application.DTOs.Team;
 using WukalaGPT.Application.Interfaces;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [Authorize(Roles = "Lawyer,Admin")]
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 public class TeamController : ControllerBase
 {
     private readonly ITeamService _teamService;

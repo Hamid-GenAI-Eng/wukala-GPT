@@ -1,10 +1,10 @@
 from typing import Dict, Any
 from langchain_core.messages import HumanMessage
-from langchain_groq import ChatGroq
+from mizan_ai.services.llm_service import llm_service
 from mizan_ai.core.config import settings
 
-# Use the blazing-fast Llama 3.1 8B model for sub-200ms latency classification
-security_llm = ChatGroq(model_name="llama-3.1-8b-instant", temperature=0, api_key=settings.GROQ_API_KEY or "dummy")
+# Use the fast LLM wrapper for sub-200ms latency classification
+security_llm = llm_service.get_fast_llm()
 
 def security_check_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -17,6 +17,12 @@ def security_check_node(state: Dict[str, Any]) -> Dict[str, Any]:
         return {"security_status": "safe"}
         
     latest_message = messages[-1].content
+    
+    # Deterministic bypass for basic greetings
+    text_lower = latest_message.lower().strip()
+    greetings = {"hi", "hello", "hey", "aoa", "salam", "assalam o alaikum", "السلام علیکم"}
+    if text_lower in greetings:
+        return {"security_status": "safe"}
     
     # The Prompt Injection Detection Prompt
     security_prompt = f"""

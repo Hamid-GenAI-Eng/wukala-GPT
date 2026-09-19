@@ -131,9 +131,6 @@ export default function LawyerDetailPage() {
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Heart className={cn("h-4 w-4", lawyer.isSaved && "fill-destructive")} />}
               <span className="ml-2 hidden sm:inline">{lawyer.isSaved ? "Saved" : "Save Profile"}</span>
             </Button>
-            <Button className="bg-gradient-primary shadow-lg shadow-primary/20">
-              Book Appointment
-            </Button>
           </div>
         </div>
 
@@ -190,11 +187,15 @@ export default function LawyerDetailPage() {
                   </div>
                   <div className="text-center md:border-r border-border/50">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Success Rate</p>
-                    <p className="text-lg font-bold text-primary">94%</p>
+                    <p className="text-lg font-bold text-primary">
+                      {lawyer.casesWon && (lawyer.casesWon + (lawyer.activeCases || 0)) > 0 
+                        ? Math.round((lawyer.casesWon / (lawyer.casesWon + (lawyer.activeCases || 0))) * 100) + '%' 
+                        : 'N/A'}
+                    </p>
                   </div>
                   <div className="text-center">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-1">Cases</p>
-                    <p className="text-lg font-bold text-primary">450+</p>
+                    <p className="text-lg font-bold text-primary">{(lawyer.casesWon || 0) + (lawyer.activeCases || 0)}</p>
                   </div>
                 </div>
               </CardContent>
@@ -214,7 +215,7 @@ export default function LawyerDetailPage() {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-muted-foreground uppercase opacity-50">Office Address</p>
-                    <p className="text-sm font-medium">1st Floor Legal Wing, Tower-X, {lawyer.city}</p>
+                    <p className="text-sm font-medium">{lawyer.chamberAddress || `${lawyer.city} (Chamber address not provided)`}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -223,7 +224,7 @@ export default function LawyerDetailPage() {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-muted-foreground uppercase opacity-50">Direct Line</p>
-                    <p className="text-sm font-medium">+92 300 000 0000</p>
+                    <p className="text-sm font-medium">{lawyer.phoneNumber || 'Not provided'}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -258,8 +259,8 @@ export default function LawyerDetailPage() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
+            <div className="max-w-4xl mx-auto space-y-6">
+              <div className="space-y-6">
                 <Card className="border-border">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -281,40 +282,52 @@ export default function LawyerDetailPage() {
                         Specializations & Experts
                      </CardTitle>
                    </CardHeader>
-                   <CardContent>
-                     <div className="flex flex-wrap gap-2">
-                       {lawyer.specialities.map(spec => (
-                         <div key={spec.id} className="flex flex-col p-4 bg-muted/20 border border-border/50 rounded-xl hover:bg-muted/40 transition-colors cursor-default">
-                           <span className="font-bold text-sm tracking-tight">{spec.name}</span>
-                           <span className="text-[10px] text-muted-foreground uppercase mt-1">Certified Practice</span>
+                   <CardContent className="space-y-6">
+                     {(() => {
+                       const customTags = lawyer.specialization ? lawyer.specialization.split(',').map(s => s.trim()).filter(Boolean) : [];
+                       const hasSpecialities = lawyer.specialities.length > 0;
+                       const hasCustomTags = customTags.length > 0;
+
+                       if (!hasSpecialities && !hasCustomTags) {
+                         return <p className="text-muted-foreground italic">No specialized expertise provided.</p>;
+                       }
+
+                       return (
+                         <div className="space-y-6">
+                           {hasCustomTags && (
+                             <div>
+                               <h4 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">Custom Specializations</h4>
+                               <div className="flex flex-wrap gap-2">
+                                 {customTags.map((tag, idx) => (
+                                   <div key={idx} className="flex flex-col p-4 bg-muted/20 border border-border/50 rounded-xl hover:bg-muted/40 transition-colors cursor-default">
+                                     <span className="font-bold text-sm tracking-tight">{tag}</span>
+                                     <span className="text-[10px] text-muted-foreground uppercase mt-1">Specialization</span>
+                                   </div>
+                                 ))}
+                               </div>
+                             </div>
+                           )}
+
+                           {hasSpecialities && (
+                             <div>
+                               <h4 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">Certified Practice Areas</h4>
+                               <div className="flex flex-wrap gap-2">
+                                 {lawyer.specialities.map(spec => (
+                                   <div key={spec.id} className="flex flex-col p-4 bg-muted/20 border border-border/50 rounded-xl hover:bg-muted/40 transition-colors cursor-default">
+                                     <span className="font-bold text-sm tracking-tight">{spec.name}</span>
+                                     <span className="text-[10px] text-muted-foreground uppercase mt-1">Certified Practice</span>
+                                   </div>
+                                 ))}
+                               </div>
+                             </div>
+                           )}
                          </div>
-                       ))}
-                     </div>
+                       );
+                     })()}
                    </CardContent>
                 </Card>
               </div>
 
-              <div className="space-y-6">
-                <Card className="border-border bg-primary/5 border-primary/10">
-                  <CardHeader>
-                    <CardTitle className="text-sm font-bold uppercase tracking-widest text-primary">Quick Certifications</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <Shield className="h-5 w-5 text-primary" />
-                      <span className="text-sm font-medium">PBC Registered Lawyer</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <GraduationCap className="h-5 w-5 text-primary" />
-                      <span className="text-sm font-medium">{lawyer.degreeTitle} Degree</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Languages className="h-5 w-5 text-primary" />
-                      <span className="text-sm font-medium tracking-tight">Urdu • English • Punjabi</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
             </div>
           </TabsContent>
 

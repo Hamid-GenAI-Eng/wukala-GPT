@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -48,6 +49,7 @@ interface UIMessage {
   content: string;
   sender: 'user' | 'ai' | 'system';
   timestamp: Date;
+  audioUrl?: string;
 }
 
 interface DocumentData {
@@ -71,8 +73,15 @@ export default function ChatPage() {
   const [caseIntelligenceData, setCaseIntelligenceData] = useState<any>(null);
   
   // API State
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { sessionId } = useParams();
+  const activeSessionId = sessionId || null;
+
+  // Base path prefix based on whether we are in the lawyer dashboard or standard chat
+  const basePath = location.pathname.startsWith('/lawyer-dashboard') ? '/lawyer-dashboard/mizan-ai' : '/chat';
+
   const [sessions, setSessions] = useState<AiChatSession[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
@@ -163,13 +172,31 @@ export default function ChatPage() {
       try {
         setIsLoadingMessages(true);
         const data = await api.getAiChatMessages(activeSessionId);
-        const uiMessages: UIMessage[] = data.map(m => ({
-          id: m.id,
-          content: m.content,
-          sender: m.role.toLowerCase() as 'user' | 'ai' | 'system',
-          timestamp: new Date(m.createdAt),
-        }));
-        setMessages(uiMessages);
+        if (data.length === 0) {
+          // If no messages returned but we have an optimistic inflight message, preserve it
+          setMessages(prev => (prev.length === 1 && prev[0].sender === 'user') ? prev : []);
+        } else {
+          const uiMessages: UIMessage[] = data.map(m => {
+            let content = m.content;
+            let audioUrl = undefined;
+            
+            // Extract embedded base64 audio if present
+            const audioMatch = content.match(/\[audio_base64:(.*?)\]/);
+            if (audioMatch && audioMatch[1]) {
+              audioUrl = audioMatch[1];
+              content = content.replace(audioMatch[0], '').trim();
+            }
+            
+            return {
+              id: m.id,
+              content: content,
+              sender: m.role.toLowerCase() as 'user' | 'ai' | 'system',
+              timestamp: new Date(m.createdAt),
+              audioUrl: audioUrl
+            };
+          });
+          setMessages(uiMessages);
+        }
       } catch (error) {
         console.error('Failed to load messages:', error);
         toast({ title: 'Error', description: 'Failed to load messages.', variant: 'destructive' });
@@ -263,7 +290,8 @@ export default function ChatPage() {
         // Stop tracks after recording finishes
         mediaRecorder.stream.getTracks().forEach(track => track.stop());
         
-        await handleSendMultimodal("", [audioFile], true);
+        const audioUrl = URL.createObjectURL(audioBlob);
+        await handleSendMultimodal("", [audioFile], true, audioUrl);
       };
 
       mediaRecorder.start();
@@ -290,7 +318,7 @@ export default function ChatPage() {
     }
   };
 
-  const handleSendMultimodal = async (text: string, files: File[], isVoice: boolean = false) => {
+  const handleSendMultimodal = async (text: string, files: File[], isVoice: boolean = false, voiceUrl?: string) => {
     if (!text.trim() && files.length === 0) return;
 
     if (chatMode === 'case_intelligence' || chatMode === 'urdu_fir') {
@@ -361,10 +389,11 @@ export default function ChatPage() {
         const title = isVoice ? "Voice Message" : (text ? (text.length > 30 ? text.substring(0, 30) + '...' : text) : "Multimodal Chat");
         const session = await api.createAiChatSession(title);
         targetSessionId = session.id;
-        setActiveSessionId(session.id);
+        navigate(`${basePath}/${session.id}`, { replace: true });
         loadSessions(); // refresh sidebar
-      } catch (error) {
-        toast({ title: 'Error', description: 'Failed to create session', variant: 'destructive' });
+      } catch (error: any) {
+        const errorMsg = error?.message || String(error);
+        toast({ title: 'Error', description: `Failed to create session: ${errorMsg}`, variant: 'destructive' });
         return;
       }
     }
@@ -373,13 +402,14 @@ export default function ChatPage() {
       id: Date.now().toString(),
       content: isVoice ? "🎤 *Sent a voice message*" : (text + (files.length > 0 ? `\n\n*[Attached ${files.length} files]*` : "")),
       sender: 'user',
-      timestamp: new Date()
+      timestamp: new Date(),
+      audioUrl: voiceUrl
     };
     setMessages(prev => [...prev, newUserMessage]);
     setIsTyping(true);
 
     try {
-      const response = await api.sendAiChatMessageMultimodal(text, false, targetSessionId, files);
+      const response = await api.sendAiChatMessageMultimodal(newUserMessage.content, false, targetSessionId, files);
       
       const newAiMessage: UIMessage = {
         id: (Date.now() + 1).toString(),
@@ -411,7 +441,7 @@ export default function ChatPage() {
     try {
       await api.deleteAiChatSession(sessionId);
       if (activeSessionId === sessionId) {
-        setActiveSessionId(null);
+        navigate(basePath);
       }
       toast({ title: 'Success', description: 'Session deleted.' });
       loadSessions();
@@ -421,7 +451,7 @@ export default function ChatPage() {
   };
 
   const startNewChat = () => {
-    setActiveSessionId(null);
+    navigate(basePath);
     if (isMobile) setIsSidebarOpen(false);
   };
 
@@ -474,7 +504,7 @@ export default function ChatPage() {
     }
   };
 
-  const renderMessageContent = (rawContent: string) => {
+  const renderMessageContent = (rawContent: string, isUser: boolean = false) => {
     let content = rawContent;
     let docs: DocumentData[] = [];
     
@@ -489,10 +519,36 @@ export default function ChatPage() {
         console.error('Failed to parse Mizan docs', e);
       }
     }
+    
+    // Check if the remaining content is JSON (fallback if backend returned raw JSON)
+    try {
+      let cleanContent = content.replace(/```json\s*/, '').replace(/```\s*$/, '').trim();
+      const parsed = JSON.parse(cleanContent);
+      if (parsed && typeof parsed.answer === 'string') {
+        content = parsed.answer;
+      }
+    } catch (e) {
+      // Not JSON, continue treating as string
+    }
+
+    // Deduplicate docs
+    const uniqueDocs: DocumentData[] = [];
+    const seen = new Set<string>();
+    for (const doc of docs) {
+      const label = doc.citation || doc.source || 'Document';
+      if (!seen.has(label)) {
+        seen.add(label);
+        uniqueDocs.push(doc);
+      }
+    }
+
 
     return (
       <div className="flex flex-col gap-4">
-        <div dir="auto" className="prose prose-sm lg:prose-base dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent">
+        <div dir="auto" className={cn(
+          "prose prose-sm lg:prose-base dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent",
+          isUser && "text-primary-foreground prose-p:text-primary-foreground prose-strong:text-primary-foreground prose-headings:text-primary-foreground prose-a:text-primary-foreground"
+        )}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
@@ -518,22 +574,24 @@ export default function ChatPage() {
         </div>
         
         {/* Render Document Citations */}
-        {docs.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-2 pt-3 border-t border-border/50">
-            <span className="text-xs font-semibold flex items-center text-muted-foreground mr-2">
-              <FileText className="h-3 w-3 mr-1" />
-              Sources:
+        {uniqueDocs.length > 0 && (
+          <div className="flex flex-col gap-2 mt-2 pt-3 border-t border-border/50">
+            <span className="text-sm font-bold flex items-center text-foreground mb-1">
+              <FileText className="h-4 w-4 mr-2 text-primary" />
+              Sources
             </span>
-            {docs.map((doc, idx) => (
-              <Badge 
-                key={idx} 
-                variant="secondary" 
-                className="cursor-pointer hover:bg-primary/20 transition-colors text-xs py-1"
-                onClick={() => setSelectedDoc(doc)}
-              >
-                {doc.citation || doc.source || `Document ${idx + 1}`}
-              </Badge>
-            ))}
+            <div className="flex flex-wrap gap-2">
+              {uniqueDocs.map((doc, idx) => (
+                <Badge 
+                  key={idx} 
+                  variant="secondary" 
+                  className="cursor-pointer hover:bg-primary/20 transition-colors text-xs py-1 px-2 border border-border"
+                  onClick={() => setSelectedDoc(doc)}
+                >
+                  {doc.citation || doc.source || `Document ${idx + 1}`}
+                </Badge>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -713,7 +771,7 @@ export default function ChatPage() {
                       activeSessionId === session.id && "bg-accent"
                     )}
                     onClick={() => {
-                      setActiveSessionId(session.id);
+                      navigate(`${basePath}/${session.id}`);
                       if (isMobile) setIsSidebarOpen(false);
                     }}
                   >
@@ -815,7 +873,15 @@ export default function ChatPage() {
                         ? 'chat-bubble-user bg-primary text-primary-foreground' 
                         : 'chat-bubble-ai bg-muted text-foreground'
                     )}>
-                      {renderMessageContent(message.content)}
+                      {renderMessageContent(message.content, message.sender === 'user')}
+                      
+                      {/* Playback for User's Voice Query */}
+                      {message.sender === 'user' && message.audioUrl && (
+                        <div className="mt-2">
+                          <audio controls src={message.audioUrl} className="h-8 max-w-[200px]" />
+                        </div>
+                      )}
+                      
                       <p className={cn(
                         'text-[10px] lg:text-xs mt-1 lg:mt-2 opacity-70',
                         message.sender === 'user' ? 'text-primary-foreground' : 'text-muted-foreground'
@@ -900,42 +966,36 @@ export default function ChatPage() {
         <div className="p-2 lg:p-4 border-t border-border bg-card/50">
           <div className="max-w-4xl mx-auto">
             {/* Mode Toggle */}
-            <div className="mb-2 flex items-center justify-between">
-              <Select value={chatMode} onValueChange={(v: any) => setChatMode(v)}>
-                <SelectTrigger className="w-[200px] h-8 text-xs bg-background shadow-sm border-primary/20">
-                  <div className="flex items-center gap-2">
-                    {chatMode === 'case_intelligence' ? <Sparkles className="h-3 w-3 text-primary" /> : 
-                     chatMode === 'urdu_fir' ? <FileText className="h-3 w-3 text-primary" /> :
-                     <MessageSquare className="h-3 w-3 text-muted-foreground" />}
-                    <span>
-                      {chatMode === 'case_intelligence' ? 'Case Intelligence' : 
-                       chatMode === 'urdu_fir' ? 'Urdu FIR (Cross-Lingual)' : 
-                       'Standard Chat'}
-                    </span>
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="standard">
+            {location.pathname.startsWith('/lawyer-dashboard') && (
+              <div className="mb-2 flex items-center justify-between">
+                <Select value={chatMode} onValueChange={(v: any) => setChatMode(v)}>
+                  <SelectTrigger className="w-[200px] h-8 text-xs bg-background shadow-sm border-primary/20">
                     <div className="flex items-center gap-2">
-                      <MessageSquare className="h-3 w-3" />
-                      <span>Standard Chat</span>
+                      {chatMode === 'case_intelligence' ? <Sparkles className="h-3 w-3 text-primary" /> : 
+                       <MessageSquare className="h-3 w-3 text-muted-foreground" />}
+                      <span>
+                        {chatMode === 'case_intelligence' ? 'Case Intelligence' : 
+                         'Standard Chat'}
+                      </span>
                     </div>
-                  </SelectItem>
-                  <SelectItem value="case_intelligence">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-3 w-3 text-primary" />
-                      <span className="font-medium text-primary">Case Intelligence</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="urdu_fir">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-3 w-3 text-primary" />
-                      <span className="font-medium text-primary">Urdu FIR (Cross-Lingual)</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-3 w-3" />
+                        <span>Standard Chat</span>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="case_intelligence">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-3 w-3 text-primary" />
+                        <span className="font-medium text-primary">Case Intelligence</span>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Orchestration Indicator */}
             <AnimatePresence>

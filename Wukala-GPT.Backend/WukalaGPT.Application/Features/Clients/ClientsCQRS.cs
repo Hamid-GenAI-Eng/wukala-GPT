@@ -47,6 +47,10 @@ public class ClientDetailDto : ClientDto
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
     public ClientStatsDto Stats { get; set; } = new();
+    
+    public List<object> Cases { get; set; } = new();
+    public List<object> Interactions { get; set; } = new();
+    public List<object> Documents { get; set; } = new();
 }
 
 public class ClientStatsDto

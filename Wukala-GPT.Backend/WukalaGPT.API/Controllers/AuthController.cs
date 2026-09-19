@@ -4,10 +4,13 @@ using System.Security.Claims;
 using WukalaGPT.Application.DTOs.Auth;
 using WukalaGPT.Application.Interfaces;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
@@ -118,6 +121,20 @@ public class AuthController : ControllerBase
         }
     }
 
+    [HttpPost("accept-invite")]
+    public async Task<IActionResult> AcceptInvite([FromBody] AcceptInviteDto dto)
+    {
+        try
+        {
+            await _authService.AcceptInviteAsync(dto);
+            return Ok(new { message = "Invitation accepted and password set successfully. You can now login." });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [Authorize]
     [HttpPost("change-password")]
     public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
@@ -149,6 +166,25 @@ public class AuthController : ControllerBase
 
             var result = await _authService.GetMeAsync(userId);
             return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [Authorize]
+    [HttpPatch("me")]
+    public async Task<IActionResult> UpdateMe([FromBody] UpdateProfileDto dto)
+    {
+        try
+        {
+            var userIdStr = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userIdStr) || !Guid.TryParse(userIdStr, out var userId))
+                return Unauthorized(new { message = "Invalid token." });
+
+            await _authService.UpdateMeAsync(userId, dto);
+            return Ok(new { message = "Profile updated successfully." });
         }
         catch (Exception ex)
         {

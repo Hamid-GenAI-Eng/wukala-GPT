@@ -18,6 +18,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import api from '@/services/api';
 
@@ -65,11 +66,8 @@ interface DashboardData {
   revenueChart: any[];
 }
 
-interface Props {
-  onNavigate: (section: string) => void;
-}
-
-export default function DashboardOverview({ onNavigate }: Props) {
+export default function DashboardOverview() {
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -291,7 +289,7 @@ export default function DashboardOverview({ onNavigate }: Props) {
                 key={action.label}
                 variant="outline"
                 className="h-auto py-3 flex flex-col items-center gap-1.5 text-xs font-sans border-border/50 hover:bg-secondary/50"
-                onClick={() => onNavigate(action.section)}
+                onClick={() => navigate(`/lawyer-dashboard/${action.section}`)}
               >
                 <action.icon className="h-4 w-4 text-muted-foreground" />
                 {action.label}

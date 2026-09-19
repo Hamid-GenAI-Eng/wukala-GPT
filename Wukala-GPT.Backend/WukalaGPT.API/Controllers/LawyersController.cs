@@ -4,10 +4,13 @@ using System.Security.Claims;
 using WukalaGPT.Application.DTOs.Lawyer;
 using WukalaGPT.Application.Interfaces;
 
+using Asp.Versioning;
+
 namespace WukalaGPT.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[ApiVersion("1.0")]
+    [Route("api/v{version:apiVersion}/[controller]")]
 [Authorize(Roles = "Lawyer, Admin")] // Primary audience for most of these
 public class LawyersController : ControllerBase
 {
@@ -49,6 +52,20 @@ public class LawyersController : ControllerBase
         {
             var profile = await _profileService.UpdateProfileAsync(GetUserId(), dto);
             return Ok(profile);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPatch("me/settings")]
+    public async Task<IActionResult> UpdateSettings([FromBody] UpdateLawyerSettingsDto dto)
+    {
+        try
+        {
+            await _profileService.UpdateSettingsAsync(GetUserId(), dto);
+            return Ok(new { message = "Settings updated successfully." });
         }
         catch (Exception ex)
         {

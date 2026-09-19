@@ -120,6 +120,7 @@ public class LawyerProfileService : ILawyerProfileService
 
         lawyer.YearsOfExperience = dto.YearsOfExperience;
         lawyer.Bio = dto.Bio;
+        lawyer.Specialization = dto.Specialization;
         lawyer.ConsultationFee = dto.ConsultationFee;
         lawyer.ResponseTime = dto.ResponseTime;
         lawyer.IsProfileVisible = dto.IsProfileVisible;
@@ -129,6 +130,19 @@ public class LawyerProfileService : ILawyerProfileService
         await _context.SaveChangesAsync(default);
         await InvalidateSearchCacheAsync(lawyerUserId);
         return await GetProfileAsync(lawyerUserId);
+    }
+
+    public async Task UpdateSettingsAsync(Guid lawyerUserId, UpdateLawyerSettingsDto dto)
+    {
+        var lawyer = await _context.LawyerProfiles.FirstOrDefaultAsync(l => l.UserId == lawyerUserId);
+        if (lawyer == null) throw new Exception("Lawyer profile not found.");
+
+        if (dto.IsProfileVisible.HasValue) lawyer.IsProfileVisible = dto.IsProfileVisible.Value;
+        if (dto.IsAvailableForNewCases.HasValue) lawyer.IsAvailableForNewCases = dto.IsAvailableForNewCases.Value;
+        if (dto.ReceiveEmailNotifications.HasValue) lawyer.ReceiveEmailNotifications = dto.ReceiveEmailNotifications.Value;
+
+        await _context.SaveChangesAsync(default);
+        await InvalidateSearchCacheAsync(lawyerUserId);
     }
 
     public async Task<string> UpdateProfilePhotoAsync(Guid lawyerUserId, IFormFile photo)
@@ -155,8 +169,8 @@ public class LawyerProfileService : ILawyerProfileService
             LawyerProfileId = lawyer.Id,
             Role = dto.Role,
             FirmCompany = dto.FirmCompany,
-            StartDate = dto.StartDate,
-            EndDate = dto.EndDate,
+            StartDate = DateTime.SpecifyKind(dto.StartDate, DateTimeKind.Utc),
+            EndDate = dto.EndDate.HasValue ? DateTime.SpecifyKind(dto.EndDate.Value, DateTimeKind.Utc) : null,
             IsCurrent = dto.IsCurrent,
             ShortBio = dto.ShortBio,
             ProofUrl = dto.ProofUrl
@@ -189,8 +203,8 @@ public class LawyerProfileService : ILawyerProfileService
 
         exp.Role = dto.Role;
         exp.FirmCompany = dto.FirmCompany;
-        exp.StartDate = dto.StartDate;
-        exp.EndDate = dto.EndDate;
+        exp.StartDate = DateTime.SpecifyKind(dto.StartDate, DateTimeKind.Utc);
+        exp.EndDate = dto.EndDate.HasValue ? DateTime.SpecifyKind(dto.EndDate.Value, DateTimeKind.Utc) : null;
         exp.IsCurrent = dto.IsCurrent;
         exp.ShortBio = dto.ShortBio;
         exp.ProofUrl = dto.ProofUrl;

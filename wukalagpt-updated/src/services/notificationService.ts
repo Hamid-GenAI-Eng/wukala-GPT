@@ -2,7 +2,8 @@ import * as signalR from "@microsoft/signalr";
 import { toast } from "@/hooks/use-toast";
 import { triggerGlobalRefresh } from "@/utils/events";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5285";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5285/api/v1";
+const HUB_BASE_URL = API_BASE_URL.replace(/\/api(\/v\d+)?$/, "");
 
 class NotificationService {
   private connection: signalR.HubConnection | null = null;
@@ -17,7 +18,7 @@ class NotificationService {
 
     try {
       this.connection = new signalR.HubConnectionBuilder()
-        .withUrl(`${API_BASE_URL}/notificationhub`, {
+        .withUrl(`${HUB_BASE_URL}/notificationhub`, {
           accessTokenFactory: () => token,
           skipNegotiation: true,
           transport: signalR.HttpTransportType.WebSockets

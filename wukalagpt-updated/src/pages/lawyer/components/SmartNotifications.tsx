@@ -93,13 +93,23 @@ export default function SmartNotifications() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedNotif, setSelectedNotif] = useState<Notification | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [preferences, setPreferences] = useState<NotificationPreference[]>([
-    { type: 'urgent', label: 'Urgent Alerts', email: true, push: true, inApp: true, sound: true },
-    { type: 'hearing', label: 'Hearings & Court', email: true, push: true, inApp: true, sound: true },
-    { type: 'payment', label: 'Payments & Billing', email: true, push: false, inApp: true, sound: false },
-    { type: 'document', label: 'Documents', email: false, push: false, inApp: true, sound: false },
-    { type: 'reminder', label: 'Reminders', email: true, push: true, inApp: true, sound: true },
-  ]);
+  const [preferences, setPreferences] = useState<NotificationPreference[]>(() => {
+    const saved = localStorage.getItem('wukala_notif_prefs');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [
+      { type: 'urgent', label: 'Urgent Alerts', email: true, push: true, inApp: true, sound: true },
+      { type: 'hearing', label: 'Hearings & Court', email: true, push: true, inApp: true, sound: true },
+      { type: 'payment', label: 'Payments & Billing', email: true, push: false, inApp: true, sound: false },
+      { type: 'document', label: 'Documents', email: false, push: false, inApp: true, sound: false },
+      { type: 'reminder', label: 'Reminders', email: true, push: true, inApp: true, sound: true },
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('wukala_notif_prefs', JSON.stringify(preferences));
+  }, [preferences]);
 
   const fetchNotifications = async () => {
     setIsLoading(true);
@@ -117,6 +127,10 @@ export default function SmartNotifications() {
   useEffect(() => {
     fetchNotifications();
   }, []);
+
+  useEffect(() => {
+    window.dispatchEvent(new Event('notifications_updated'));
+  }, [items]);
 
   const unreadCount = items.filter(n => !n.read).length;
 

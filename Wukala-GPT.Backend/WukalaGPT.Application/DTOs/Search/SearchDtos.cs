@@ -47,10 +47,12 @@ public class LawyerClientViewDto
 {
     public Guid LawyerUserId { get; set; }
     
-    // Public Info Only (Notice NO Email/Phone/ChamberAddress)
+    // Public Info Only
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
     public string City { get; set; } = string.Empty;
+    public string PhoneNumber { get; set; } = string.Empty;
+    public string ChamberAddress { get; set; } = string.Empty;
     
     public string Specialization { get; set; } = string.Empty;
     public string BarAssociation { get; set; } = string.Empty;

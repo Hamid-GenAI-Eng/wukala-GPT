@@ -25,7 +25,9 @@ import {
   Volume2,
   Square,
   FileText,
-  Download
+  Download,
+  User,
+  Calendar
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api, Conversation, ChatMessage } from '@/services/api';
@@ -161,6 +163,12 @@ export default function MessagingPage() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const selectedConversationRef = useRef(selectedConversation);
+  
+  useEffect(() => {
+    selectedConversationRef.current = selectedConversation;
+  }, [selectedConversation]);
+
   // Initial Data Load & SignalR Connection
   useEffect(() => {
     if (token) {
@@ -170,7 +178,8 @@ export default function MessagingPage() {
 
     const unsubscribe = chatService.onMessageReceived((msg) => {
       // If message is from currently selected user, add to messages
-      if (selectedConversation && (msg.senderId === selectedConversation.targetUserId || msg.receiverId === selectedConversation.targetUserId)) {
+      const currentSelected = selectedConversationRef.current;
+      if (currentSelected && (msg.senderId === currentSelected.targetUserId || msg.receiverId === currentSelected.targetUserId)) {
         setMessages(prev => {
           if (prev.some(m => m.id === msg.id)) return prev;
           return [...prev, msg];
@@ -190,7 +199,7 @@ export default function MessagingPage() {
       unsubscribe();
       unsubscribeStatus();
     };
-  }, [token, selectedConversation]);
+  }, [token]);
 
   useEffect(() => {
     const initDirectChat = async () => {
@@ -259,7 +268,14 @@ export default function MessagingPage() {
   const fetchConversations = async () => {
     try {
       const data = await api.getConversations();
-      setConversations(data);
+      setConversations(prev => {
+        // Preserve any temp conversation that hasn't been established on the server yet
+        const tempConv = prev.find(c => c.id.startsWith('temp-'));
+        if (tempConv && !data.some(c => c.targetUserId === tempConv.targetUserId)) {
+          return [tempConv, ...data];
+        }
+        return data;
+      });
     } catch (error) {
       toast.error("Failed to load conversations");
     } finally {
@@ -647,17 +663,18 @@ export default function MessagingPage() {
                   </div>
                 </div>
               </div>
-              
-              <div className="flex items-center space-x-1">
-                <Button variant="ghost" size="icon" className="hover:bg-primary/5 text-primary">
-                  <Phone className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="hover:bg-primary/5 text-primary">
-                  <Video className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
+              <div className="flex items-center space-x-2 pr-1">
+                {!isLawyer && selectedConversation.isLawyer && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="hidden md:flex text-xs h-8 px-3 border-primary/20 text-primary hover:bg-primary/10 transition-all font-semibold"
+                    onClick={() => navigate(`/lawyer/${selectedConversation.targetUserId}`)}
+                  >
+                    <User className="h-3.5 w-3.5 mr-1.5" /> 
+                    View Profile
+                  </Button>
+                )}
               </div>
             </div>
 

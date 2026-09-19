@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { 
   User, 
   Mail, 
@@ -26,7 +26,9 @@ import {
   CheckCircle,
   ExternalLink,
   Loader2,
-  GraduationCap
+  GraduationCap,
+  Clock,
+  X
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import api, { SpecialityResponse, ExperienceResponse, EducationResponse } from '@/services/api';
@@ -54,6 +56,7 @@ const LawyerProfilePage = () => {
     experiences: [] as ExperienceResponse[],
     educations: [] as EducationResponse[],
     specialities: [] as any[],
+    specialization: '',
     profilePhotoUrl: '',
     rating: 0,
     reviewCount: 0,
@@ -66,6 +69,7 @@ const LawyerProfilePage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [allSpecialities, setAllSpecialities] = useState<SpecialityResponse[]>([]);
   const [selectedSpecIds, setSelectedSpecIds] = useState<string[]>([]);
+  const [customSpecInput, setCustomSpecInput] = useState('');
 
   // Dialog State
   const [isExpOpen, setIsExpOpen] = useState(false);
@@ -118,6 +122,7 @@ const LawyerProfilePage = () => {
         experiences: data.experiences || [],
         educations: data.educations || [],
         specialities: data.specialities || [],
+        specialization: data.specialization || '',
         profilePhotoUrl: data.profilePhotoUrl || '',
         rating: Number(data.rating ?? data.Rating) || 0,
         reviewCount: Number(data.reviewCount ?? data.ReviewCount) || 0,
@@ -159,18 +164,7 @@ const LawyerProfilePage = () => {
     setProfileData(prev => ({ ...prev, [key]: newValue }));
     
     try {
-      const nameParts = profileData.name.trim().split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
-      
-      await api.updateLawyerMe({
-        firstName,
-        lastName,
-        phoneNumber: profileData.phone,
-        city: profileData.city,
-        bio: profileData.bio,
-        consultationFee: parseFloat(profileData.hourlyRate) || 0,
-        yearsOfExperience: parseInt(profileData.experience) || 0,
+      await api.patchLawyerSettings({
         isProfileVisible: key === 'isProfileVisible' ? newValue : profileData.isProfileVisible,
         isAvailableForNewCases: key === 'isAvailableForNewCases' ? newValue : profileData.isAvailableForNewCases,
         receiveEmailNotifications: key === 'receiveEmailNotifications' ? newValue : profileData.receiveEmailNotifications
@@ -189,6 +183,21 @@ const LawyerProfilePage = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const customTags = profileData.specialization ? profileData.specialization.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+  const handleAddCustomTag = () => {
+    if (customSpecInput.trim()) {
+      const newTags = [...customTags, customSpecInput.trim()];
+      handleInputChange('specialization', newTags.join(', '));
+      setCustomSpecInput('');
+    }
+  };
+
+  const handleRemoveCustomTag = (tagToRemove: string) => {
+    const newTags = customTags.filter(t => t !== tagToRemove);
+    handleInputChange('specialization', newTags.join(', '));
   };
 
   const handleSpecialityToggle = (id: string) => {
@@ -213,6 +222,7 @@ const LawyerProfilePage = () => {
         bio: profileData.bio,
         consultationFee: parseFloat(profileData.hourlyRate) || 0,
         yearsOfExperience: parseInt(profileData.experience) || 0,
+        specialization: profileData.specialization,
         isProfileVisible: profileData.isProfileVisible,
         isAvailableForNewCases: profileData.isAvailableForNewCases,
         receiveEmailNotifications: profileData.receiveEmailNotifications
@@ -623,9 +633,8 @@ const LawyerProfilePage = () => {
           {/* Right Column - Detailed Information */}
           <div className="lg:col-span-2">
             <Tabs defaultValue="about" className="space-y-4 sm:space-y-6">
-              <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto gap-1">
+              <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto gap-1">
                 <TabsTrigger value="about" className="text-xs sm:text-sm py-2">About</TabsTrigger>
-                <TabsTrigger value="specializations" className="text-xs sm:text-sm py-2">Specializations</TabsTrigger>
                 <TabsTrigger value="experience" className="text-xs sm:text-sm py-2">Experience</TabsTrigger>
                 <TabsTrigger value="education" className="text-xs sm:text-sm py-2">Education</TabsTrigger>
                 <TabsTrigger value="settings" className="text-xs sm:text-sm py-2">Settings</TabsTrigger>
@@ -642,13 +651,19 @@ const LawyerProfilePage = () => {
                   </CardHeader>
                   <CardContent>
                     {isEditing ? (
-                      <Textarea
-                        value={profileData.bio}
-                        onChange={(e) => handleInputChange('bio', e.target.value)}
-                        rows={6}
-                        placeholder="Tell clients about your experience, legal expertise, accomplishments, and client focus..."
-                        className="text-sm leading-relaxed"
-                      />
+                      <div className="space-y-2">
+                        <Textarea
+                          value={profileData.bio}
+                          onChange={(e) => handleInputChange('bio', e.target.value.substring(0, 500))}
+                          maxLength={500}
+                          rows={6}
+                          placeholder="Tell clients about your experience, legal expertise, accomplishments, and client focus..."
+                          className="text-sm leading-relaxed"
+                        />
+                        <div className="text-xs text-muted-foreground text-right">
+                          {profileData.bio.length} / 500 characters
+                        </div>
+                      </div>
                     ) : (
                       <p className="text-muted-foreground leading-relaxed text-sm whitespace-pre-wrap">
                         {profileData.bio || "No professional bio added yet. Write one to attract more clients."}
@@ -659,137 +674,100 @@ const LawyerProfilePage = () => {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <Award className="w-5 h-5 mr-2 text-primary" />
-                        <span>Specializations & Practices</span>
-                      </div>
+                    <CardTitle className="flex items-center">
+                      <Award className="w-5 h-5 mr-2 text-primary" />
+                      Specialization & Expert
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     {isEditing ? (
-                      <div className="space-y-4">
-                        <p className="text-xs text-muted-foreground">Select all target specialities that represent your legal practice:</p>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                          {allSpecialities.map((spec) => {
-                            const isChecked = selectedSpecIds.includes(spec.id);
-                            return (
-                              <label
-                                key={spec.id}
-                                className={`flex items-center gap-3 p-3 rounded-lg border text-sm cursor-pointer transition-all ${
-                                  isChecked 
-                                    ? "bg-primary/5 border-primary text-primary font-bold shadow-sm" 
-                                    : "bg-background border-border text-muted-foreground hover:bg-muted/50"
-                                }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() => handleSpecialityToggle(spec.id)}
-                                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                />
-                                <span className="truncate">{spec.name}</span>
-                              </label>
-                            );
-                          })}
+                      <div className="space-y-6">
+                        <div className="space-y-4">
+                          <p className="text-sm font-semibold">Custom Specializations</p>
+                          <p className="text-xs text-muted-foreground">Type a specific domain or expertise and press Enter to add it:</p>
+                          <div className="flex gap-2">
+                            <Input
+                              value={customSpecInput}
+                              onChange={e => setCustomSpecInput(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleAddCustomTag();
+                                }
+                              }}
+                              placeholder="e.g. Corporate Taxation, Family Dispute Resolution..."
+                              className="flex-1"
+                            />
+                            <Button type="button" onClick={handleAddCustomTag} variant="secondary">Add</Button>
+                          </div>
+                          
+                          <div className="flex flex-wrap gap-2 pt-2">
+                            {customTags.map((tag, idx) => (
+                              <Badge key={idx} variant="secondary" className="px-3 py-1.5 flex items-center gap-1.5 bg-primary/10 text-primary hover:bg-primary/20">
+                                {tag}
+                                <button onClick={() => handleRemoveCustomTag(tag)} className="text-primary hover:text-destructive transition-colors rounded-full hover:bg-destructive/10 p-0.5">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-4 pt-4 border-t border-border">
+                          <p className="text-sm font-semibold">Standard Practice Areas</p>
+                          <p className="text-xs text-muted-foreground">Select all target specialities that represent your legal practice:</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-2">
+                            {allSpecialities.map((spec) => {
+                              const isChecked = selectedSpecIds.includes(spec.id);
+                              return (
+                                <div
+                                  key={spec.id}
+                                  onClick={() => handleSpecialityToggle(spec.id)}
+                                  className={`flex items-start gap-3.5 p-4 rounded-xl border text-sm cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99] select-none ${
+                                    isChecked 
+                                      ? "bg-primary/5 border-primary shadow-sm text-foreground" 
+                                      : "bg-card border-border hover:bg-muted/40 text-muted-foreground"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    readOnly
+                                    className="mt-0.5 h-4.5 w-4.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+                                  />
+                                  <div className="flex flex-col gap-0.5 min-w-0">
+                                    <span className={`font-semibold tracking-tight transition-colors ${isChecked ? 'text-primary' : 'text-foreground'}`}>
+                                      {spec.name}
+                                    </span>
+                                    <span className="text-[11px] leading-tight text-muted-foreground/90 font-medium truncate">
+                                      {spec.description || 'Certified legal domain field'}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
                     ) : (
                       <div className="flex flex-wrap gap-2">
-                        {profileData.specialities && profileData.specialities.length > 0 ? (
+                        {customTags.map((tag, idx) => (
+                          <Badge key={`custom-${idx}`} variant="outline" className="px-3 py-1 bg-primary/10 text-primary border-primary/20 text-sm">
+                            {tag}
+                          </Badge>
+                        ))}
+                        {profileData.specialities && profileData.specialities.length > 0 && (
                           profileData.specialities.map((spec: any, idx: number) => (
-                            <Badge key={idx} variant="outline" className="px-3 py-1 bg-primary/5 text-primary border-primary/20 hover:bg-primary/10">
+                            <Badge key={`std-${idx}`} variant="outline" className="px-3 py-1 bg-primary/5 text-primary border-primary/20 hover:bg-primary/10 text-sm">
                               {spec.name || spec}
                             </Badge>
                           ))
-                        ) : (
-                          <p className="text-sm text-muted-foreground">No specializations selected yet. Edit profile to choose yours!</p>
+                        )}
+                        {customTags.length === 0 && (!profileData.specialities || profileData.specialities.length === 0) && (
+                          <p className="text-sm text-muted-foreground italic">No specialized expertise defined yet. Edit profile to choose yours!</p>
                         )}
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              {/* SPECIALIZATIONS TAB */}
-              <TabsContent value="specializations" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Award className="w-5 h-5 text-primary animate-pulse" />
-                        <span>Practice Specializations Form</span>
-                      </div>
-                      <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
-                        {selectedSpecIds.length} Selected
-                      </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="bg-primary/5 p-4 rounded-xl border border-primary/20 text-sm text-foreground flex flex-col gap-1.5 leading-relaxed">
-                      <span className="font-bold text-primary">Interactive Specialization Practice Form</span>
-                      <span className="text-muted-foreground text-xs">Manage the legal practice areas and domains that appear on your public marketplace profile. Potential clients will filter and search for you based on these certified fields.</span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-2">
-                      {allSpecialities.map((spec) => {
-                        const isChecked = selectedSpecIds.includes(spec.id);
-                        return (
-                          <div
-                            key={spec.id}
-                            onClick={() => handleSpecialityToggle(spec.id)}
-                            className={`flex items-start gap-3.5 p-4 rounded-xl border text-sm cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99] select-none ${
-                              isChecked 
-                                ? "bg-primary/5 border-primary shadow-sm text-foreground" 
-                                : "bg-card border-border hover:bg-muted/40 text-muted-foreground"
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              readOnly
-                              className="mt-0.5 h-4.5 w-4.5 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
-                            />
-                            <div className="flex flex-col gap-0.5 min-w-0">
-                              <span className={`font-semibold tracking-tight transition-colors ${isChecked ? 'text-primary' : 'text-foreground'}`}>
-                                {spec.name}
-                              </span>
-                              <span className="text-[11px] leading-tight text-muted-foreground/90 font-medium truncate">
-                                {spec.description || 'Certified legal domain field'}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <div className="flex justify-end pt-4 border-t border-border/50">
-                      <Button 
-                        onClick={async () => {
-                          try {
-                            setIsLoading(true);
-                            await api.updateSpecialities(selectedSpecIds);
-                            await fetchProfile();
-                            toast({
-                              title: "Success",
-                              description: "Specializations form updated successfully.",
-                            });
-                          } catch (err: any) {
-                            toast({
-                              title: "Error",
-                              description: err.message || "Failed to update specializations.",
-                              variant: "destructive"
-                            });
-                          } finally {
-                            setIsLoading(false);
-                          }
-                        }}
-                        className="bg-primary hover:bg-primary/90 text-white shadow-md shadow-primary/20 min-w-[150px]"
-                      >
-                        <Save className="h-4 w-4 mr-2" />
-                        Update Form
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -938,13 +916,15 @@ const LawyerProfilePage = () => {
                 {/* DEGREES LIST */}
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="flex items-center text-base">
-                      <GraduationCap className="w-5 h-5 mr-2 text-primary" />
-                      Degrees & Certifications
+                    <CardTitle className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <GraduationCap className="w-5 h-5 mr-2 text-primary" />
+                        Education & Credentials
+                      </div>
+                      <Button onClick={() => openEduDialog()} size="sm" variant="outline" className="h-8">
+                        <Plus className="h-4 w-4 mr-1" /> Add Education
+                      </Button>
                     </CardTitle>
-                    <Button onClick={() => openEduDialog()} size="sm" className="bg-primary text-white hover:bg-primary/90">
-                      <Plus className="h-4 w-4 mr-1" /> Add Qualification
-                    </Button>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     {profileData.educations && profileData.educations.length > 0 ? (
@@ -988,7 +968,7 @@ const LawyerProfilePage = () => {
                     ) : (
                       <div className="text-center py-8 bg-muted/10 rounded-xl border border-dashed">
                         <GraduationCap className="h-10 w-10 text-muted-foreground/40 mx-auto mb-2" />
-                        <h4 className="font-semibold text-sm">No degrees uploaded yet</h4>
+                        <h4 className="font-semibold text-sm">No education added yet</h4>
                         <p className="text-xs text-muted-foreground max-w-xs mx-auto mt-1">Upload verified copies of your certifications to raise your verification score.</p>
                       </div>
                     )}
@@ -1099,14 +1079,19 @@ const LawyerProfilePage = () => {
               <Label htmlFor="isCurrent" className="cursor-pointer">Currently employed here</Label>
             </div>
 
-            <div className="space-y-1">
-              <Label>Description / Responsibilities</Label>
-              <Textarea
-                placeholder="Describe your legal focus, primary client work, key achievements..."
+            <div className="space-y-2">
+              <Label htmlFor="shortBio">Description (max 200 characters)</Label>
+              <Textarea 
+                id="shortBio" 
                 value={expForm.shortBio}
-                onChange={(e) => setExpForm(prev => ({ ...prev, shortBio: e.target.value }))}
+                onChange={(e) => setExpForm(prev => ({ ...prev, shortBio: e.target.value.substring(0, 200) }))}
+                maxLength={200}
+                placeholder="Describe your role and accomplishments..."
                 rows={3}
               />
+              <div className="text-xs text-muted-foreground text-right">
+                {expForm.shortBio.length} / 200 characters
+              </div>
             </div>
 
             <div className="space-y-1.5">
@@ -1140,9 +1125,12 @@ const LawyerProfilePage = () => {
 
       {/* --- EDUCATION DIALOG --- */}
       <Dialog open={isEduOpen} onOpenChange={setIsEduOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>{editingEdu ? 'Edit Qualification' : 'Add Qualification'}</DialogTitle>
+            <DialogTitle>{editingEdu ? 'Edit Education' : 'Add Education'}</DialogTitle>
+            <DialogDescription>
+              Add details about your degrees and academic qualifications.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1">
@@ -1196,7 +1184,7 @@ const LawyerProfilePage = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEduOpen(false)}>Cancel</Button>
-            <Button onClick={saveEducation}>Save Qualification</Button>
+            <Button onClick={saveEducation}>Save Education</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

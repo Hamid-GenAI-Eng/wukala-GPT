@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import Layout from "./components/Layout";
 import HomePage from "./pages/HomePage";
@@ -45,6 +45,18 @@ import { useEffect } from "react";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { User } from "./services/api";
 import { ThemeProvider } from "./contexts/ThemeContext";
+
+// Lawyer Dashboard Components
+import DashboardOverview from './pages/lawyer/components/DashboardOverview';
+import CaseManagement from './pages/lawyer/components/CaseManagement';
+import HearingCalendar from './pages/lawyer/components/HearingCalendar';
+import ClientCRM from './pages/lawyer/components/ClientCRM';
+import DocumentDrafting from './pages/lawyer/components/DocumentDrafting';
+import FeeBilling from './pages/lawyer/components/FeeBilling';
+import SmartNotifications from './pages/lawyer/components/SmartNotifications';
+import PracticeAnalytics from './pages/lawyer/components/PracticeAnalytics';
+import TeamManagement from './pages/lawyer/components/TeamManagement';
+import DocumentVault from './pages/lawyer/components/DocumentVault';
 
 const queryClient = new QueryClient();
 
@@ -101,7 +113,27 @@ const App = () => {
                 <LawyerDashboard />
               </ProtectedRoute>
             }
-          />
+          >
+            <Route index element={<Navigate to="overview" replace />} />
+            <Route path="overview" element={<DashboardOverview />} />
+            <Route path="messages" element={<MessagingPage />} />
+            <Route path="mizan-ai" element={<ChatPage />} />
+            <Route path="mizan-ai/:sessionId" element={<ChatPage />} />
+            <Route path="cases" element={<CaseManagement />} />
+            <Route path="cases/:caseId" element={<CaseManagement />} />
+            <Route path="calendar" element={<HearingCalendar />} />
+            <Route path="clients" element={<ClientCRM />} />
+            <Route path="clients/:clientId" element={<ClientCRM />} />
+            <Route path="documents" element={<DocumentDrafting />} />
+            <Route path="documents/workspace/:encodedPath" element={<DocumentDrafting />} />
+            <Route path="billing" element={<FeeBilling />} />
+            <Route path="billing/:type/:id" element={<FeeBilling />} />
+            <Route path="notifications" element={<SmartNotifications />} />
+            <Route path="analytics" element={<PracticeAnalytics />} />
+            <Route path="team" element={<TeamManagement />} />
+            <Route path="vault" element={<DocumentVault />} />
+            <Route path="vault/:type/:id" element={<DocumentVault />} />
+          </Route>
           
           {/* Main app routes with layout */}
           <Route path="/" element={<Layout><HomePage /></Layout>} />
@@ -117,6 +149,11 @@ const App = () => {
           <Route path="/help" element={<Layout><HelpSupportPage /></Layout>} />
           <Route path="/leadership" element={<Layout><LeadershipPage /></Layout>} />
           <Route path="/chat" element={
+            <ProtectedRoute>
+              <Layout><ChatPage /></Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/chat/:sessionId" element={
             <ProtectedRoute>
               <Layout><ChatPage /></Layout>
             </ProtectedRoute>

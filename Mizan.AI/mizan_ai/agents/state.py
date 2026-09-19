@@ -5,6 +5,10 @@ import operator
 class GraphState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     intent: str
+    pre_router_info: dict
+    normalized_query: dict
+    evidence: list[dict]
+    evidence_status: str
     context_documents: list[dict]
     summary: str
     deep_research_iterations: int

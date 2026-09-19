@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { 
   Upload, 
@@ -17,11 +18,17 @@ import {
   SortDesc,
   Calendar,
   Eye,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { api, DocumentResponse, DocumentClassification } from '@/services/api';
 import { toast } from 'sonner';
+import { Document as PdfDocument, Page as PdfPage, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 // Mapping from Category String to Enum (used for API requests)
 const categoryToEnum: Record<string, number> = {
@@ -51,10 +58,20 @@ export default function DocumentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewingDocument, setViewingDocument] = useState<DocumentResponse | null>(null);
+  const [documentUrl, setDocumentUrl] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isDragging, setIsDragging] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
+    handleResize(); // Check on mount
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     fetchDocuments();
@@ -155,21 +172,45 @@ export default function DocumentsPage() {
 
   const handleDownload = async (document: DocumentResponse) => {
     try {
-      if (document.url) {
-        window.open(document.url, '_blank');
-        return;
-      }
+      const toastId = toast.loading('Securely preparing document for download...');
+      const blob = await api.downloadLegalDocument(document.id);
+      const url = URL.createObjectURL(blob);
       
-      // Fallback: Get document info and try to open/download
-      const data = await api.getDocument(document.id);
-      if (data.url) {
-        window.open(data.url, '_blank');
-      } else {
-        toast.info('No direct URL available for this document.');
-      }
-    } catch (error: any) {
-      toast.error('Failed to retrieve document for download');
+      const a = window.document.createElement('a');
+      a.href = url;
+      a.download = document.name;
+      window.document.body.appendChild(a);
+      a.click();
+      window.document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      toast.success('Document downloaded successfully!', { id: toastId });
+    } catch (error) {
+      toast.error('Failed to securely download document.');
+      console.error('Download error:', error);
     }
+  };
+
+  const handleView = async (document: DocumentResponse) => {
+    try {
+      let docUrl = document.url;
+      setViewingDocument(document);
+      setDocumentUrl(null); // Start loading state
+      const blob = await api.downloadLegalDocument(document.id);
+      const url = URL.createObjectURL(blob);
+      setDocumentUrl(url);
+    } catch (error) {
+      toast.error('Failed to securely load document for viewing.');
+      closeViewer();
+    }
+  };
+
+  const closeViewer = () => {
+    if (documentUrl && documentUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(documentUrl);
+    }
+    setViewingDocument(null);
+    setDocumentUrl(null);
   };
 
   const handleDelete = async (documentId: string) => {
@@ -183,17 +224,23 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container px-4 py-6 sm:py-8">
-        {/* Header */}
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold font-serif mb-2">Document Management</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Upload, organize, and manage your legal documents securely.
-          </p>
-        </div>
+    <div className="flex h-[calc(100vh-64px)] bg-background overflow-hidden relative">
+      
+      {/* Left Area (List) */}
+      <div className={cn(
+        "flex flex-col h-full overflow-hidden transition-all duration-300 ease-in-out",
+        viewingDocument ? "w-full lg:w-[450px] xl:w-[500px] border-r border-border shrink-0" : "w-full"
+      )}>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          {/* Header */}
+          <div className="mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold font-serif mb-2">Document Management</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Upload, organize, and manage your legal documents securely.
+            </p>
+          </div>
 
-        {/* Upload Area */}
+          {/* Upload Area */}
         <Card className="mb-6 sm:mb-8">
           <CardContent className="p-4 sm:p-6">
             <div
@@ -324,12 +371,12 @@ export default function DocumentsPage() {
                 {viewMode === 'grid' ? (
                   <CardContent className="p-4">
                     <div className="flex flex-col items-center text-center space-y-3">
-                      <div className="p-3 rounded-xl bg-muted/50">
+                      <div className="p-3 rounded-xl bg-muted/50" onClick={() => handleView(document)}>
                         {getFileIcon(document.mimeType)}
                       </div>
                       
                       <div className="w-full text-center">
-                        <h3 className="font-medium text-sm truncate px-2" title={document.name}>
+                        <h3 className="font-medium text-sm truncate px-2 cursor-pointer hover:text-primary" onClick={() => handleView(document)} title={document.name}>
                           {document.name}
                         </h3>
                         <p className="text-xs text-muted-foreground mt-1">
@@ -345,6 +392,9 @@ export default function DocumentsPage() {
                       </Badge>
 
                       <div className="flex items-center justify-center space-x-2 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0" title="View" onClick={() => handleView(document)}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         <Button size="sm" variant="outline" className="h-8 w-8 p-0" title="Download" onClick={() => handleDownload(document)}>
                           <Download className="h-4 w-4" />
                         </Button>
@@ -356,12 +406,12 @@ export default function DocumentsPage() {
                   </CardContent>
                 ) : (
                   <div className="flex items-center space-x-4">
-                    <div className="p-2 rounded-lg bg-muted/50">
+                    <div className="p-2 rounded-lg bg-muted/50 cursor-pointer" onClick={() => handleView(document)}>
                       {getFileIcon(document.mimeType)}
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-sm truncate">{document.name}</h3>
+                      <h3 className="font-medium text-sm truncate cursor-pointer hover:text-primary" onClick={() => handleView(document)}>{document.name}</h3>
                       <div className="flex items-center space-x-4 text-xs text-muted-foreground mt-1">
                         <span>{document.sizeFormatted}</span>
                         <span>{document.timeAgo || formatDate(document.uploadedAt)}</span>
@@ -372,6 +422,9 @@ export default function DocumentsPage() {
                     </div>
 
                     <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button size="sm" variant="outline" className="h-8 w-8 p-0" title="View" onClick={() => handleView(document)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
                       <Button size="sm" variant="outline" className="h-8 w-8 p-0" title="Download" onClick={() => handleDownload(document)}>
                         <Download className="h-4 w-4" />
                       </Button>
@@ -400,6 +453,156 @@ export default function DocumentsPage() {
           }
         }}
       />
+      </div>
+
+
+      {/* Right Area (Desktop Viewer) */}
+      {viewingDocument && (
+        <div className="hidden lg:flex flex-col flex-1 bg-muted/10 relative overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b border-border bg-background/80 backdrop-blur-sm z-10">
+            <div className="flex items-center gap-3">
+              {getFileIcon(viewingDocument.mimeType)}
+              <div>
+                <h3 className="font-semibold text-sm max-w-md truncate">{viewingDocument.name}</h3>
+                <p className="text-xs text-muted-foreground">{viewingDocument.sizeFormatted}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => handleDownload(viewingDocument)}>
+                <Download className="h-4 w-4 mr-2" /> Download
+              </Button>
+              <Button variant="ghost" size="icon" onClick={closeViewer}>
+                <X className="h-5 w-5 text-muted-foreground hover:text-foreground" />
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 w-full h-full p-6 flex items-center justify-center overflow-hidden relative">
+            {documentUrl ? (
+              viewingDocument.mimeType?.startsWith('image/') ? (
+                <img src={documentUrl} alt={viewingDocument.name} className="max-w-full max-h-full object-contain shadow-sm rounded-lg" />
+              ) : viewingDocument.mimeType?.includes('pdf') ? (
+                <PDFViewer url={documentUrl} />
+              ) : (
+                <iframe src={documentUrl} className="w-full h-full bg-white shadow-sm rounded-lg border border-border" title={viewingDocument.name} />
+              )
+            ) : (
+              <div className="flex flex-col items-center justify-center text-muted-foreground animate-pulse">
+                <Loader2 className="h-10 w-10 mb-4 animate-spin text-primary" />
+                <p>Loading secure document viewer...</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Modal Viewer */}
+      {!isDesktop && (
+        <Dialog open={!!viewingDocument} onOpenChange={(open) => !open && closeViewer()}>
+          <DialogContent className="lg:hidden max-w-[100vw] h-[100dvh] w-full p-0 flex flex-col m-0 rounded-none border-0 overflow-hidden">
+            <DialogHeader className="p-4 border-b flex-shrink-0 bg-background">
+            <div className="flex items-center justify-between w-full pr-8">
+              <DialogTitle className="flex items-center gap-2 truncate text-sm">
+                <Eye className="w-4 h-4 text-primary shrink-0" />
+                <span className="truncate">{viewingDocument?.name}</span>
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 w-full bg-muted/10 overflow-hidden flex items-center justify-center p-2 relative">
+            {documentUrl ? (
+              viewingDocument?.mimeType?.startsWith('image/') ? (
+                <img src={documentUrl} alt={viewingDocument?.name} className="max-w-full max-h-full object-contain shadow-sm rounded-md" />
+              ) : viewingDocument?.mimeType?.includes('pdf') ? (
+                <PDFViewer url={documentUrl} />
+              ) : (
+                <iframe src={documentUrl} className="w-full h-full bg-white shadow-sm rounded-md border border-border" title={viewingDocument?.name} />
+              )
+            ) : (
+              <div className="flex flex-col items-center justify-center text-muted-foreground">
+                <Loader2 className="h-8 w-8 mb-4 animate-spin text-primary" />
+                <p className="text-sm">Loading document...</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      )}
     </div>
   );
-}
+}
+
+// PDF Viewer Component using react-pdf
+const PDFViewer = ({ url }: { url: string }) => {
+  const [numPages, setNumPages] = useState<number>();
+  const [pageNumber, setPageNumber] = useState<number>(1);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      setContainerWidth(containerRef.current.clientWidth);
+    }
+    const handleResize = () => {
+      if (containerRef.current) {
+        setContainerWidth(containerRef.current.clientWidth);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
+    setNumPages(numPages);
+  }
+
+  return (
+    <div ref={containerRef} className="flex flex-col items-center overflow-y-auto h-full w-full bg-muted/20 rounded-lg relative">
+      <div className="flex-1 overflow-auto w-full flex justify-center py-4">
+        <PdfDocument
+          file={url}
+          onLoadSuccess={onDocumentLoadSuccess}
+          loading={<Loader2 className="h-8 w-8 animate-spin text-primary mt-10" />}
+          error={
+            <div className="flex flex-col items-center justify-center p-6 text-center h-full">
+              <p className="mb-4 text-muted-foreground">Unable to preview this PDF directly.</p>
+              <Button variant="default" onClick={() => window.open(url, '_blank')}>
+                <Download className="mr-2 h-4 w-4" /> Download to View
+              </Button>
+            </div>
+          }
+        >
+          <PdfPage 
+            pageNumber={pageNumber} 
+            renderTextLayer={false}
+            renderAnnotationLayer={false}
+            className="shadow-md" 
+            width={containerWidth ? Math.min(containerWidth - 32, 800) : undefined} 
+          />
+        </PdfDocument>
+      </div>
+      
+      {numPages && numPages > 1 && (
+        <div className="flex items-center gap-4 p-3 bg-background/90 backdrop-blur-sm border-t w-full justify-center shrink-0">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setPageNumber(prev => Math.max(prev - 1, 1))}
+            disabled={pageNumber <= 1}
+          >
+            Previous
+          </Button>
+          <span className="text-sm font-medium">
+            {pageNumber} / {numPages}
+          </span>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setPageNumber(prev => Math.min(prev + 1, numPages))}
+            disabled={pageNumber >= numPages}
+          >
+            Next
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+};
